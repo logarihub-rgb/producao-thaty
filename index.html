@@ -93,11 +93,11 @@ main{max-width:1100px;margin:0 auto;padding:18px 16px 96px;display:flex;flex-dir
 .op{cursor:pointer;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
 .op:hover{border-color:var(--accent)}
 .op .code{font-family:var(--font-display);font-size:24px;font-weight:700;color:var(--accent)}
-.steps{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
 .steps div{height:6px;border-radius:3px;background:var(--line)}
 .steps div.on{background:var(--accent)}
 .steps div.half{background:var(--tape)}
-.steplbl{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;font-size:11px;color:var(--muted)}
+.steplbl{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;font-size:11px;color:var(--muted)}
 
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
 .stat{border:1px solid var(--line);border-radius:10px;padding:8px 10px}
@@ -155,6 +155,10 @@ tfoot td{font-weight:600;border-bottom:0}
 .fab{position:fixed;right:16px;bottom:24px;z-index:8;display:flex;align-items:center;gap:8px;background:var(--tape);color:#1b2130;border:0;border-radius:999px;padding:12px 18px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.25);cursor:pointer}
 .fab[hidden]{display:none}
 @media (max-width:760px){.fab{bottom:calc(76px + env(safe-area-inset-bottom))}}
+details.sec>summary{list-style:none;cursor:pointer;display:flex;flex-direction:column;gap:10px}
+details.sec>summary::-webkit-details-marker{display:none}
+details.sec>summary h2::after{content:" ▾";font-size:14px;color:var(--muted)}
+details.sec:not([open])>summary h2::after{content:" ▸"}
 .viewer{max-width:100%;max-height:70vh;border-radius:8px;align-self:center}
 @media (prefers-reduced-motion:no-preference){.op,.btn{transition:border-color .15s}}
 </style>
@@ -255,8 +259,9 @@ function finance(){
   const rec = S.lanc.filter(l => l.tipo === "recebimento").sort((a,b)=>(a.data||"").localeCompare(b.data||""));
   const apply = (list, val) => { for (const d of list){ if (val <= 0.0001) break; const f = pn(d.valor) - d.pago; if (f <= 0) continue; const x = Math.min(f, val); d.pago += x; val -= x; } return val; };
   let sobra = 0;
-  rec.filter(r => r.opId).forEach(r => { sobra += apply(deb.filter(d => d.opId === r.opId), pn(r.valor)); });
-  sobra += sum(rec.filter(r => !r.opId), r => pn(r.valor));
+  rec.filter(r => r.secao).forEach(r => { sobra += apply(deb.filter(d => (!r.opId || d.opId === r.opId) && secaoDe(d) === r.secao), pn(r.valor)); });
+  rec.filter(r => !r.secao && r.opId).forEach(r => { sobra += apply(deb.filter(d => d.opId === r.opId), pn(r.valor)); });
+  sobra += sum(rec.filter(r => !r.secao && !r.opId), r => pn(r.valor));
   sobra = apply(deb, sobra);
   const st = d => d.pago >= pn(d.valor) - 0.005 ? "pago" : d.pago > 0 ? "parcial" : "pendente";
   const map = {}; deb.forEach(d => map[d.id] = {pago:d.pago, st:st(d)});
@@ -292,16 +297,14 @@ function calc(op){
   });
   const enviado = sum(partes, t => t.q);
   const costurado = sum(partes, t => t.entregue);
-  const entregas = op.entregasCliente || [];
-  const entregueCliente = sum(entregas, e => pn(e.qtd));
-  const defeitos = sum(entregas, e => pn(e.defeitos));
+  const entregueCliente = costurado;
   const tecidoOk = op.retalho || pn(op.kg) > 0;
-  // etapas: 0 tecido, 1 corte, 2 costura, 3 conferência/entrega, 4 concluída
-  const etapa = [tecidoOk ? 2 : 0, cortado >= qtd && qtd ? 2 : cortado ? 1 : 0, costurado >= qtd && qtd ? 2 : enviado ? 1 : 0, entregueCliente >= qtd && qtd ? 2 : entregueCliente ? 1 : 0, op.concluida ? 2 : 0];
+  // etapas: tecido, corte, costura (entrega da oficina = entrega para a Thaty), finalizado
+  const etapa = [tecidoOk ? 2 : 0, cortado >= qtd && qtd ? 2 : cortado ? 1 : 0, costurado >= qtd && qtd ? 2 : enviado ? 1 : 0, op.concluida || (qtd && costurado >= qtd) ? 2 : 0];
   let st = 0, stLabel = "Aguardando tecido";
-  if (op.concluida || (qtd && entregueCliente >= qtd)){ st = 3; stLabel = "Entregue"; }
-  else if (entregueCliente){ st = 2; stLabel = "Entregando"; }
-  else if (enviado){ st = 2; stLabel = costurado >= enviado && enviado ? "Costura pronta" : "Na costura"; }
+  if (op.concluida || (qtd && costurado >= qtd)){ st = 3; stLabel = "Entregue"; }
+  else if (costurado){ st = 2; stLabel = "Entregando"; }
+  else if (enviado){ st = 2; stLabel = "Na costura"; }
   else if (cortado){ st = 1; stLabel = cortado >= qtd ? "Cortado" : "No corte"; }
   else if (tecidoOk){ st = 1; stLabel = "Tecido comprado"; }
   return {
@@ -309,7 +312,7 @@ function calc(op){
     pecasRolo: pn(op.rolos) ? qtd / pn(op.rolos) : null, assessoria: qtd * S.cfg.assessoria,
     cortado, aCortar:Math.max(0,qtd-cortado), corteUn, corteTotal:qtd*corteUn, cortePago, corteAPagar:Math.max(0, cortado*corteUn - cortePago),
     partes, enviado, aEnviar:Math.max(0, cortado-enviado), costurado, naCostura:Math.max(0, enviado-costurado),
-    entregas, entregueCliente, defeitos, aEntregarCliente: Math.max(0, costurado - entregueCliente),
+    entregueCliente,
     costuraAPagar: sum(partes,t=>t.aPagar), etapa,
     st, stLabel, aberta: st < 3
   };
@@ -416,7 +419,7 @@ function render(){
 }
 
 function stepsHtml(k){
-  const lb = ["Tecido","Corte","Costura","Entrega","Fim"];
+  const lb = ["Tecido","Corte","Costura","Entregue"];
   return `<div><div class="steps">${k.etapa.map(e=>`<div class="${e===2?"on":e===1?"half":""}"></div>`).join("")}</div><div class="steplbl">${lb.map(l=>`<span>${l}</span>`).join("")}</div></div>`;
 }
 function opCard(op){
@@ -425,7 +428,7 @@ function opCard(op){
     <div class="row between"><span class="code">${opCode(op)}</span><span class="chip s${k.st}">${k.stLabel}</span></div>
     <div><b>${esc(k.prod?.nome || "Produto removido")}</b><div class="small muted">Início ${fdate(op.data)} · ${fmt(k.qtd)} peças${op.retalho?" · retalho":""}</div></div>
     ${stepsHtml(k)}
-    <div class="row between small"><span class="muted">Corte ${fmt(k.cortado)} · Costura ${fmt(k.costurado)} · Entregue ${fmt(k.entregueCliente)}</span></div>
+    <div class="row between small"><span class="muted">Cortado ${fmt(k.cortado)} · Entregue ${fmt(k.costurado)} de ${fmt(k.qtd)}</span></div>
     <div class="row between small"><span class="muted">Em aberto da Thaty</span><b class="num" style="color:${f.aberto>0.005?"var(--bad)":"var(--ok)"}">${brl(f.aberto)}</b></div>
   </button>`;
 }
@@ -443,7 +446,7 @@ function viewPainel(){
     ${kpi("Pedidos abertos", fmt(ab.length), fmt(t(k=>k.qtd))+" peças")}
     ${kpi("Falta cortar", fmt(t(k=>k.aCortar)), "peças", t(k=>k.aCortar)>0?"alert":"")}
     ${kpi("Na costura", fmt(t(k=>k.naCostura)), "peças com oficinas", t(k=>k.naCostura)>0?"alert":"")}
-    ${kpi("Prontas p/ entregar", fmt(t(k=>k.aEntregarCliente)), "costuradas, falta conferir/enviar", t(k=>k.aEntregarCliente)>0?"alert":"")}
+    ${kpi("Entregue à Thaty", fmt(sum(all, x => x.k.costurado)), "peças vindas das oficinas")}
   </div>
   <h2>Em andamento</h2>
   ${ab.length ? `<div class="oplist">${ab.sort((a,b)=>b.o.num-a.o.num).map(x=>opCard(x.o)).join("")}</div>` : `<div class="empty">Nenhum pedido aberto. Crie um em “+ Novo pedido”.</div>`}
@@ -522,7 +525,7 @@ function lancRow(l){
   const ic = isRec ? `<div class="ic rec">PG</div>` : l.tipo === "despesa" ? `<div class="ic desp">RB</div>` : `<div class="ic cob">CB</div>`;
   const op = opById(l.opId);
   const st = isRec ? `<span class="chip s3">Recebido</span>` : stChip(F.map[l.id]?.st);
-  return `<div class="lanc">${ic}<div><div><b>${esc(isRec ? "Pagamento da Thaty" : l.cat)}</b> <span class="small muted">· ${opCode(op)} · ${fdate(l.data)}</span></div>
+  return `<div class="lanc">${ic}<div><div><b>${esc(isRec ? "Pagamento" + (l.secao ? " · " + (SECOES.find(x => x[0] === l.secao)?.[1] || "") : "") : l.cat)}</b> <span class="small muted">· ${opCode(op)} · ${fdate(l.data)}</span></div>
     <div class="small muted">${esc(l.desc||"")}${l.por?` · lançado por ${esc(l.por)}`:""}</div><div class="row" style="gap:6px;margin-top:4px">${st}${l.auto?`<span class="chip s0">automático</span>`:""}${anexoHtml(l.anexo)}${S.readonly||l.auto?"":`<button class="btn sm ghost" data-editl="${esc(l.id)}">Editar</button>`}</div></div>
     <div class="val ${isRec?"neg":""}">${isRec?"− ":""}${brl(pn(l.valor))}</div></div>`;
 }
@@ -541,15 +544,11 @@ function viewOp(id){
     ${ed?`<div class="row"><button class="btn" id="editop">Editar pedido</button><button class="btn" id="fimop">${op.concluida?"Reabrir":"Concluir"}</button><button class="btn danger" id="delop">Excluir</button></div>`:""}</div>
   ${stepsHtml(k)}
 
-  <div class="card"><div class="row between"><h2>Conta deste pedido</h2>${ed?`<div class="row"><button class="btn sm" data-novo="despesa">+ Serviço / reembolso</button><button class="btn sm pri" data-novo="recebimento">+ Pagamento da Thaty</button></div>`:""}</div>
+  <div class="card"><div class="row between"><h2>Conta deste pedido</h2></div>
     <div class="stats">${st("Cobrado", brl(f.cob))}${st("Reembolsos", brl(f.desp))}${st("Pago pela Thaty", brl(f.pago))}${st("Em aberto", brl(f.aberto), f.aberto>0.005)}</div>
-    <h3>Cobranças automáticas</h3>
-    <div class="small muted">Geradas sozinhas: tecido ao lançar o pedido, corte a cada entrega do cortador, assessoria quando o corte termina e costura a cada entrega da oficina.</div>
-    ${ets.length ? `<div>${ets.map(e => `<div class="billrow"><div><b>${e.cat}</b> <span class="small muted">· ${fdate(e.data)}</span><div class="small muted">${esc(e.desc)}</div></div>
-      <b class="num">${brl(e.valor)}</b><div>${e.lanc ? stChip(S.F.map[e.lanc.id]?.st) : `<span class="small muted">gerando…</span>`}</div></div>`).join("")}</div>` : `<div class="small muted">Nenhuma etapa concluída ainda.</div>`}
-    <h3>Lançamentos</h3>
-    ${lancs.length ? `<div>${lancs.map(lancRow).join("")}</div>` : `<div class="small muted">Nenhum lançamento ainda.</div>`}
+    <div class="small muted">Cobranças automáticas: tecido ao lançar o pedido, corte e costura a cada entrega, assessoria quando o corte termina.</div>
   </div>
+  ${secoesHtml(S.lanc.filter(l => l.opId === op.id), op.id)}
 
   <div class="card"><h2>Tecido</h2><div class="stats">
     ${st("Quantidade", fmt(k.qtd)+" pç")}
@@ -575,7 +574,7 @@ function viewOp(id){
       <div><div class="row between"><h3>Pago ao cortador</h3>${ed?`<button class="btn sm" data-add="cp|">+ Pagamento</button>`:""}</div>${hist(c.pagamentos,"cp","",true)}</div>
     </div></div>
 
-  <div class="card"><div class="row between"><div><h2>Costura</h2><div class="small muted">Enviado ${fmt(k.enviado)} · costurado ${fmt(k.costurado)} · <b>falta enviar ${fmt(k.aEnviar)}</b> peças cortadas</div></div>${ed?`<button class="btn pri sm" id="addparte">+ Enviar p/ oficina</button>`:""}</div>
+  <div class="card"><div class="row between"><div><h2>Costura e entrega</h2><div class="small muted">A entrega da oficina já conta como entregue à Thaty · enviado ${fmt(k.enviado)} · entregue ${fmt(k.costurado)} · <b>falta enviar ${fmt(k.aEnviar)}</b> peças cortadas</div></div>${ed?`<button class="btn pri sm" id="addparte">+ Enviar p/ oficina</button>`:""}</div>
     ${k.partes.length ? k.partes.map(t => `<div class="parte">
       <div class="row between"><div><b>${t.label} · ${esc(t.local||"Oficina")}</b><div class="small muted">Enviado ${fdate(t.data)} · ${fmt(t.q)} pç × ${brl(t.un)} = ${brl(t.total)}</div></div>
         ${ed?`<div class="row"><button class="btn sm" data-add="te|${t.idx}">+ Entrega</button><button class="btn sm" data-add="tp|${t.idx}">+ Pago à oficina</button><button class="btn sm ghost" data-editparte="${t.idx}">Editar</button><button class="btn sm ghost danger" data-delparte="${t.idx}">Excluir</button></div>`:""}</div>
@@ -584,45 +583,55 @@ function viewOp(id){
     </div>`).join("") : `<div class="empty">Nada enviado para costura ainda.</div>`}
   </div>
 
-  <div class="card"><div class="row between"><div><h2>Conferência e entrega</h2><div class="small muted">Costurado ${fmt(k.costurado)} · entregue à Thaty ${fmt(k.entregueCliente)} · falta ${fmt(k.aEntregarCliente)}</div></div>${ed?`<button class="btn pri sm" data-add="ec|">+ Entrega conferida</button>`:""}</div>
-    <div class="stats">${st("Entregue à Thaty", `${fmt(k.entregueCliente)} de ${fmt(k.qtd)}`)}${st("Com defeito (separadas)", fmt(k.defeitos)+" pç", k.defeitos>0)}</div>
-    ${hist(k.entregas,"ec","")}
-  </div>`;
+`;
 }
 
+/* Financeiro por sessões: Tecido, Corte, Costura, Serviços e insumos, Assessoria */
+const SECOES = [["Tecido","Tecido"],["Corte","Corte"],["Costura","Costura"],["Servicos","Serviços e insumos"],["Assessoria","Assessoria"]];
+const secaoDe = l => l.tipo === "despesa" ? "Servicos" : (["Tecido","Corte","Costura","Assessoria"].includes(l.cat) ? l.cat : "Servicos");
+function secoesHtml(ls, opId){
+  const F = S.F; const ed = !S.readonly;
+  return SECOES.map(([k, nome]) => {
+    const it = ls.filter(l => l.tipo !== "recebimento" && secaoDe(l) === k).sort((a,b)=>(b.data||"").localeCompare(a.data||""));
+    const pgs = ls.filter(l => l.tipo === "recebimento" && l.secao === k).sort((a,b)=>(b.data||"").localeCompare(a.data||""));
+    const cob = sum(it, l => pn(l.valor)), pago = sum(it, l => F.map[l.id]?.pago || 0), ab = cob - pago;
+    const st = !it.length ? `<span class="chip s0">sem lançamentos</span>` : ab > 0.005 ? `<span class="chip s1">em aberto</span>` : `<span class="chip s3">pago</span>`;
+    const btnPagar = ed && ab > 0.005 ? `<button class="btn sm pri" data-pagar="${esc(opId||"")}|${k}|${r2(ab)}">Pagar ${brl(ab)}</button>` : "";
+    const btnServ = ed && k === "Servicos" ? `<button class="btn sm" data-serv="${esc(opId||"")}">+ Serviço</button>` : "";
+    return `<details class="card sec" ${ab > 0.005 ? "open" : ""}><summary><div class="row between"><h2>${nome}</h2><div class="row">${st}${btnServ}${btnPagar}</div></div>
+      <div class="stats"><div class="stat"><span>Valor</span><b>${brl(cob)}</b></div><div class="stat"><span>Pago</span><b>${brl(pago)}</b></div><div class="stat ${ab>0.005?"hl":""}"><span>Em aberto</span><b>${brl(ab)}</b></div></div></summary>
+      ${it.length ? `<div>${it.map(lancRow).join("")}</div>` : `<div class="small muted">Nada lançado nesta sessão.</div>`}
+      ${pgs.length ? `<h3>Pagamentos</h3><div>${pgs.map(lancRow).join("")}</div>` : ""}</details>`;
+  }).join("");
+}
 function viewFinanceiro(){
   const F = S.F; const ed = !S.readonly; const fo = S.fin.op;
   let ls = [...S.lanc];
   if (fo === "geral") ls = ls.filter(l => !l.opId); else if (fo !== "todas") ls = ls.filter(l => l.opId === fo);
-  if (S.fin.tipo && S.fin.tipo !== "todos") ls = ls.filter(l => l.tipo === S.fin.tipo);
-  ls.sort((a,b)=>(b.data||"").localeCompare(a.data||"") || (b.criadoEm||"").localeCompare(a.criadoEm||""));
-  const pend = S.lanc.filter(l => l.tipo !== "recebimento" && F.map[l.id]?.st !== "pago");
-  return `<div class="row between"><h1>Financeiro</h1>${ed?`<div class="row"><button class="btn" data-novo="cobranca">+ Cobrança</button><button class="btn" data-novo="despesa">+ Serviço / reembolso</button><button class="btn pri" data-novo="recebimento">+ Pagamento da Thaty</button></div>`:""}</div>
+  const recs = ls.filter(l => l.tipo === "recebimento").sort((a,b)=>(b.data||"").localeCompare(a.data||""));
+  const deb = ls.filter(l => l.tipo !== "recebimento");
+  const tot = sum(deb, l => pn(l.valor)), pago = sum(deb, l => F.map[l.id]?.pago || 0);
+  return `<div class="row between"><h1>Financeiro</h1>${ed?`<div class="row"><button class="btn" data-novo="despesa">+ Serviço</button></div>`:""}</div>
+  <div class="field"><label for="finop">Pedido</label><select id="finop"><option value="todas">Todos os pedidos</option><option value="geral" ${fo==="geral"?"selected":""}>Geral (sem pedido)</option>${sortedOps().map(o=>`<option value="${esc(o.id)}" ${fo===o.id?"selected":""}>${opCode(o)} · ${esc(produto(o.produtoId)?.nome||"")}</option>`).join("")}</select></div>
   <div class="kpis">
-    <div class="kpi big"><span>Saldo a pagar (Thaty)</span><b>${brl(Math.max(0,F.saldo))}</b><small>${F.credito>0.005?`crédito de ${brl(F.credito)}`:`${pend.length} item(ns) em aberto`}</small></div>
-    <div class="kpi"><span>Cobrado (etapas)</span><b>${brl(F.totCob)}</b></div>
-    <div class="kpi"><span>Reembolsos</span><b>${brl(F.totDesp)}</b><small>em aberto ${brl(F.despAberto)}</small></div>
-    <div class="kpi"><span>Pago pela Thaty</span><b>${brl(F.totRec)}</b></div>
+    <div class="kpi big"><span>Em aberto (Thaty)</span><b>${brl(Math.max(0, tot - pago))}</b><small>${fo==="todas" && F.credito>0.005 ? `crédito de ${brl(F.credito)}` : "a pagar"}</small></div>
+    <div class="kpi"><span>Total</span><b>${brl(tot)}</b></div>
+    <div class="kpi"><span>Pago</span><b>${brl(pago)}</b></div>
   </div>
-  <div class="card">
-    <div class="row">
-      <div class="field grow"><label for="finop">Pedido</label><select id="finop"><option value="todas">Todos</option><option value="geral" ${fo==="geral"?"selected":""}>Geral (sem pedido)</option>${sortedOps().map(o=>`<option value="${esc(o.id)}" ${fo===o.id?"selected":""}>${opCode(o)} · ${esc(produto(o.produtoId)?.nome||"")}</option>`).join("")}</select></div>
-      <div class="field grow"><label for="fintp">Tipo</label><select id="fintp">${[["todos","Todos"],["cobranca","Cobranças"],["despesa","Reembolsos"],["recebimento","Pagamentos da Thaty"]].map(([v,t])=>`<option value="${v}" ${S.fin.tipo===v?"selected":""}>${t}</option>`).join("")}</select></div>
-    </div>
-    ${ls.length ? `<div>${ls.map(lancRow).join("")}</div>` : `<div class="empty">Nenhum lançamento.</div>`}
-    <div class="small muted">Os pagamentos da Thaty abatem primeiro as cobranças do pedido indicado, da mais antiga para a mais nova. Pagamento sem pedido abate o que estiver aberto há mais tempo.</div>
-  </div>`;
+  ${secoesHtml(ls, fo !== "todas" && fo !== "geral" ? fo : "")}
+  ${recs.filter(l => !l.secao).length ? `<details class="card sec"><summary><div class="row between"><h2>Pagamentos sem sessão</h2><b class="num">${brl(sum(recs.filter(l => !l.secao), l => pn(l.valor)))}</b></div></summary>${recs.filter(l => !l.secao).map(lancRow).join("")}</details>` : ""}`;
 }
 
-function lancForm(tipo, l, opIdDefault){
+function lancForm(tipo, l, opIdDefault, extra0 = {}){
   const novo = !l;
   const cats = tipo === "despesa" ? CAT_DESP : CAT_COB;
-  const titles = {cobranca:"cobrança", despesa:"serviço / reembolso", recebimento:"pagamento da Thaty"};
+  const titles = {cobranca:"cobrança", despesa:"serviço", recebimento:"pagamento"};
   const fields = [
     {name:"opId",label:"Pedido",type:"select",full:true,value:l?.opId ?? opIdDefault ?? "",options:[{v:"",t:"Geral (sem pedido)"}, ...sortedOps().map(o=>({v:o.id,t:`${opCode(o)} · ${produto(o.produtoId)?.nome||""}`}))]},
+    ...(tipo === "recebimento" ? [{name:"secao",label:"Sessão",type:"select",full:true,value:l?.secao||extra0.secao||"Tecido",options:SECOES.map(([v,t])=>({v,t}))}] : []),
     ...(tipo !== "recebimento" ? [{name:"cat",label:tipo==="despesa"?"Tipo de gasto":"Etapa",type:"select",value:l?.cat||cats[0],options:cats.map(c=>({v:c,t:c}))}] : []),
     {name:"data",label:"Data",type:"date",value:l?.data||today()},
-    {name:"valor",label:"Valor (R$)",type:"num",value:l?.valor ?? (tipo==="despesa" ? (padraoServ(cats[0]) || "") : ""), full: tipo==="recebimento"},
+    {name:"valor",label:"Valor (R$)",type:"num",value:l?.valor ?? extra0.valor ?? (tipo==="despesa" ? (padraoServ(cats[0]) || "") : ""), full: tipo==="recebimento"},
     {name:"desc",label:tipo==="recebimento"?"Observação (ex.: PIX)":"Descrição",full:true,value:l?.desc||"",ph:tipo==="despesa"?"Ex.: motoboy corte → oficina Ronald":""},
   ];
   fields.push({name:"arquivo",label:l?.anexo?"Trocar comprovante (opcional)":tipo==="despesa"?"Comprovante (print da corrida, nota, risco)":"Comprovante (opcional)",type:"file",hint:"Foto ou PDF, até 15 MB."});
@@ -634,7 +643,7 @@ function lancForm(tipo, l, opIdDefault){
       let anexo = l?.anexo || null;
       if (v.arquivo){ try { anexo = await uploadFile(v.arquivo); } catch(e){ return String(e); } }
       const rec = {...(l?clone(l):{}), por: l?.por || S.user, id: l?.id || "l" + uid(), tipo, opId: v.opId, data: v.data, valor: r2(v.valor), desc: v.desc, anexo, criadoEm: l?.criadoEm || new Date().toISOString()};
-      if (tipo !== "recebimento") rec.cat = v.cat;
+      if (tipo !== "recebimento") rec.cat = v.cat; else rec.secao = v.secao;
       saveLanc(rec);
     }});
   const d = $("#dell"); if (d) d.onclick = () => { closeModal(); confirmBox("Excluir este lançamento? O comprovante fica guardado.", () => write("lanc/"+l.id, null)); };
@@ -733,6 +742,8 @@ function bind(){
   const st = $("#subtabs"); if (st) st.onclick = e => { const b = e.target.closest("button"); if (b){ S.sub = b.dataset.s; render(); } };
   document.querySelectorAll("[data-ver]").forEach(b => b.onclick = e => { e.stopPropagation(); verAnexo(b.dataset.ver, b.dataset.ct); });
   document.querySelectorAll("[data-novo]").forEach(b => b.onclick = () => lancForm(b.dataset.novo, null, S.view === "producoes" ? S.opId : (S.fin.op !== "todas" && S.fin.op !== "geral" ? S.fin.op : "")));
+  document.querySelectorAll("[data-pagar]").forEach(b => b.onclick = e => { e.preventDefault(); e.stopPropagation(); const [op, sec, v] = b.dataset.pagar.split("|"); lancForm("recebimento", null, op, {secao: sec, valor: +v}); });
+  document.querySelectorAll("[data-serv]").forEach(b => b.onclick = e => { e.preventDefault(); e.stopPropagation(); lancForm("despesa", null, b.dataset.serv); });
   document.querySelectorAll("[data-editl]").forEach(b => b.onclick = () => { const l = S.lanc.find(x => x.id === b.dataset.editl); if (l) lancForm(l.tipo, l); });
   const fo = $("#finop"); if (fo) fo.onchange = e => { S.fin.op = e.target.value; render(); };
   const ft = $("#fintp"); if (ft) ft.onchange = e => { S.fin.tipo = e.target.value; render(); };
