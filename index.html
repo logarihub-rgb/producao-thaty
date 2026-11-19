@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Produção Thaty</title>
-<meta name="theme-color" content="#d1477f">
+<title>Produção Thaty ✨</title>
+<meta name="theme-color" content="#fbf0f4">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Produção">
 <link rel="manifest" href="manifest.json">
@@ -18,8 +18,8 @@
 <style>
 /* Layout: app de chão de fábrica para produção sob encomenda — barra fixa (topo no PC, base no celular), painel com saldo da cliente, OPs como fichas com etapas tecido→corte→costura→entrega, extrato financeiro com comprovantes */
 :root{
-  --bg:#fbf4f7; --surface:#ffffff; --ink:#2b1a22; --muted:#7d6470; --line:#f0dce5;
-  --accent:#d1477f; --accent-ink:#ffffff; --tape:#e8739f; --tape-soft:#fde3ed;
+  --bg:#fdf9fa; --surface:#ffffff; --ink:#3a2a31; --muted:#8a7680; --line:#f2e7ec;
+  --accent:#c86f93; --accent-ink:#ffffff; --tape:#e9b3c8; --tape-soft:#fbf0f4;
   --ok:#1f7a4d; --ok-soft:#e0f2e8; --warn:#a15c00; --warn-soft:#fdecd2; --bad:#b3261e; --bad-soft:#fbe3e1;
   --font-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
   --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -27,11 +27,11 @@
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#1c1318; --surface:#271a21; --ink:#f5e8ee; --muted:#b597a5; --line:#3a2830;
-  --accent:#f08bb3; --accent-ink:#2b1a22; --tape:#e8739f; --tape-soft:#4a2635;
+  --accent:#e3a3bd; --accent-ink:#2b1a22; --tape:#b9758f; --tape-soft:#3a2530;
   --ok:#5cc58d; --ok-soft:#173226; --warn:#f0a94a; --warn-soft:#3a2a12; --bad:#f08a82; --bad-soft:#3d1d1b; color-scheme:dark;}}
 :root[data-theme="dark"]{
   --bg:#1c1318; --surface:#271a21; --ink:#f5e8ee; --muted:#b597a5; --line:#3a2830;
-  --accent:#f08bb3; --accent-ink:#2b1a22; --tape:#e8739f; --tape-soft:#4a2635;
+  --accent:#e3a3bd; --accent-ink:#2b1a22; --tape:#b9758f; --tape-soft:#3a2530;
   --ok:#5cc58d; --ok-soft:#173226; --warn:#f0a94a; --warn-soft:#3a2a12; --bad:#f08a82; --bad-soft:#3d1d1b; color-scheme:dark;}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
@@ -49,7 +49,7 @@ header.top{position:sticky;top:0;padding-top:env(safe-area-inset-top);z-index:5;
 .brand i{width:10px;height:26px;background:var(--tape);border-radius:2px;display:block}
 nav.tabs{display:flex;gap:4px;margin-left:auto}
 nav.tabs button{border:0;background:none;padding:8px 12px;border-radius:8px;cursor:pointer;color:var(--muted);font-weight:500}
-nav.tabs button[aria-current="page"]{background:var(--accent);color:var(--accent-ink)}
+nav.tabs button[aria-current="page"]{background:var(--tape-soft);color:var(--accent);font-weight:600}
 .sync{font-size:12px;color:var(--muted)}
 main{max-width:1100px;margin:0 auto;padding:18px 16px 96px;display:flex;flex-direction:column;gap:16px}
 @media (max-width:760px){
@@ -67,7 +67,7 @@ main{max-width:1100px;margin:0 auto;padding:18px 16px 96px;display:flex;flex-dir
 .btn{border:1px solid var(--line);background:var(--surface);padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:500;white-space:nowrap}
 .btn:hover{border-color:var(--accent)}
 .btn.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-.btn.tape{background:var(--tape);color:#fff;border-color:var(--tape)}
+.btn.tape{background:var(--tape-soft);color:var(--accent);border-color:var(--tape)}
 .btn.sm{padding:5px 10px;font-size:13px}
 .btn.danger{color:var(--bad)}
 .btn.ghost{border-color:transparent;background:none}
@@ -79,8 +79,8 @@ main{max-width:1100px;margin:0 auto;padding:18px 16px 96px;display:flex;flex-dir
 .kpi b{font-family:var(--font-display);font-size:28px;font-weight:600;line-height:1.1}
 .kpi small{font-size:12px;color:var(--muted)}
 .kpi.alert{border-left:4px solid var(--tape)}
-.kpi.big{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-.kpi.big span,.kpi.big small{color:var(--accent-ink);opacity:.85}
+.kpi.big{background:var(--tape-soft);color:var(--ink);border-color:var(--line)}
+.kpi.big span,.kpi.big small{color:var(--muted)}
 
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
 .chip.s0{background:var(--line);color:var(--muted)}
@@ -152,7 +152,7 @@ tfoot td{font-weight:600;border-bottom:0}
 .login{max-width:340px;margin:12vh auto 0;display:flex;flex-direction:column;gap:14px;text-align:center}
 .login input{font-size:28px;letter-spacing:.4em;text-align:center;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px}
 .who{font-size:12px;color:var(--muted);cursor:pointer;border:0;background:none}
-.fab{position:fixed;right:16px;bottom:24px;z-index:8;display:flex;align-items:center;gap:8px;background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:12px 18px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.25);cursor:pointer}
+.fab{position:fixed;right:16px;bottom:24px;z-index:8;display:flex;align-items:center;gap:8px;background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:12px 18px;font-weight:600;box-shadow:0 4px 14px rgba(200,111,147,.28);cursor:pointer}
 .fab[hidden]{display:none}
 @media (max-width:760px){.fab{bottom:calc(76px + env(safe-area-inset-bottom))}}
 details.sec>summary{list-style:none;cursor:pointer;display:flex;flex-direction:column;gap:10px}
@@ -165,7 +165,7 @@ details.sec:not([open])>summary h2::after{content:" ▸"}
 </head>
 <body>
 <header class="top"><div class="top-in">
-  <div class="brand"><i></i>Produção Thaty</div>
+  <div class="brand"><i></i>Produção Thaty ✨</div>
   <nav class="tabs" id="tabs">
     <button data-v="painel">Painel</button>
     <button data-v="producoes">Produções</button>
@@ -876,7 +876,7 @@ function prodForm(p){
 
 /* ---------- login e sincronização ---------- */
 function viewLogin(){
-  return `<div class="login"><div class="brand" style="justify-content:center"><i></i>Produção Thaty</div>
+  return `<div class="login"><div class="brand" style="justify-content:center"><i></i>Produção Thaty ✨</div>
     <p class="muted">Digite seu PIN para entrar.</p>
     <input id="pin" type="password" inputmode="numeric" autocomplete="current-password" aria-label="PIN" maxlength="8">
     <button class="btn pri" id="entrar">Entrar</button><div id="lerr" class="small" style="color:var(--bad)"></div></div>`;

@@ -1,11 +1,11 @@
 {
-  "name": "Produção Thaty",
+  "name": "Produção Thaty ✨",
   "short_name": "Produção",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "theme_color": "#d1477f",
-  "background_color": "#fbf4f7",
+  "theme_color": "#fbf0f4",
+  "background_color": "#fdf9fa",
   "icons": [
     {
       "src": "icon-192.png",
