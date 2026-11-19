@@ -10,6 +10,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -150,6 +152,9 @@ tfoot td{font-weight:600;border-bottom:0}
 .login{max-width:340px;margin:12vh auto 0;display:flex;flex-direction:column;gap:14px;text-align:center}
 .login input{font-size:28px;letter-spacing:.4em;text-align:center;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px}
 .who{font-size:12px;color:var(--muted);cursor:pointer;border:0;background:none}
+.fab{position:fixed;right:16px;bottom:24px;z-index:8;display:flex;align-items:center;gap:8px;background:var(--tape);color:#1b2130;border:0;border-radius:999px;padding:12px 18px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.25);cursor:pointer}
+.fab[hidden]{display:none}
+@media (max-width:760px){.fab{bottom:calc(76px + env(safe-area-inset-bottom))}}
 .viewer{max-width:100%;max-height:70vh;border-radius:8px;align-self:center}
 @media (prefers-reduced-motion:no-preference){.op,.btn{transition:border-color .15s}}
 </style>
@@ -167,17 +172,18 @@ tfoot td{font-weight:600;border-bottom:0}
   <span class="sync" id="sync">Conectando…</span><button class="who" id="who" hidden></button>
 </div></header>
 <main id="main"><div class="empty">Carregando dados da produção…</div></main>
+<button class="fab" id="fab" hidden aria-label="Lançar outro serviço ou reembolso"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M6 2h12a1 1 0 0 1 1 1v18l-3-2-2 2-2-2-2 2-2-2-3 2V3a1 1 0 0 1 1-1zm2 5v2h8V7H8zm0 4v2h8v-2H8zm0 4v2h5v-2H8z"/></svg><span>Serviço</span></button>
 <div id="modal-root"></div>
 
 <script src="config.js"></script>
 <script>
-const DEF_CFG = {extra:2.9, assessoria:1, corteUn:0.4, corteLocal:"THÁSSIO", costuraUn:2.8, perda:0};
+const DEF_CFG = {extra:2.9, assessoria:1, corteUn:0.4, corteLocal:"THÁSSIO", costuraUn:2.8, perda:0, modelagem:80};
 const VIEWS = ["painel","producoes","financeiro","orcamento","cadastros"];
 const COLS = ["insumos","produtos","ops","lanc"];
 const API = window.PT_API || "";
 const S = {pin:"", user:"", ok:false, insumos:[], produtos:[], ops:[], lanc:[], cfg:{...DEF_CFG}, loaded:{}, view:"painel", opId:null, sub:"insumos", orc:{prod:"",qtd:""}, fin:{op:"todas"}, readonly:false};
 const CAT_COB = ["Tecido","Corte","Costura","Assessoria","Outro"];
-const CAT_DESP = ["Frete motoboy","Carreto","Impressão de risco","Modelagem","Pilotagem","Outro"];
+const CAT_DESP = ["Modelagem","Pilotagem","Impressão de risco","Frete motoboy","Carreto","Outro"];
 
 /* ---------- utilidades ---------- */
 const $ = s => document.querySelector(s);
@@ -203,6 +209,10 @@ async function api(action, body={}){
   return j;
 }
 let pendentes = 0;
+/* cache local: o app abre na hora com os últimos dados e atualiza em segundo plano */
+let cacheT;
+function salvarCache(){ clearTimeout(cacheT); cacheT = setTimeout(() => { try { store.set("pt_cache", JSON.stringify({insumos:S.insumos, produtos:S.produtos, ops:S.ops, lanc:S.lanc, cfg:S.cfg, rev:S.rev})); } catch(e){} }, 400); }
+function lerCache(){ try { const c = JSON.parse(store.get("pt_cache") || "null"); if (!c) return false; COLS.forEach(k => { S[k] = c[k] || []; S.loaded[k] = true; }); S.cfg = {...DEF_CFG, ...(c.cfg||{})}; S.rev = c.rev; return true; } catch(e){ return false; } }
 function setSync(t){ const el = $("#sync"); if (el) el.textContent = t; }
 const queues = {};
 function write(path, data){
@@ -211,13 +221,18 @@ function write(path, data){
   const key = col === "config" ? null : col;
   if (key){ const arr = S[key]; const i = arr.findIndex(x => x.id === id); if (data === null){ if (i >= 0) arr.splice(i,1); } else { const o = {id, ...clone(data)}; if (i >= 0) arr[i] = o; else arr.push(o); } }
   else if (data) S.cfg = {...DEF_CFG, ...data};
-  pendentes++; setSync("Salvando…"); render();
+  pendentes++; setSync("Salvando…"); render(); salvarCache();
   const run = () => api("put", {col, id, data}).then(j => { S.rev = j.rev; }).catch(e => { toast("Não foi possível salvar: " + e.message); carregar(); })
     .finally(() => { pendentes--; if (!pendentes) setSync("Sincronizado"); });
   queues[path] = (queues[path] || Promise.resolve()).then(run);
   return queues[path];
 }
-const saveOp = op => { const {id, ...d} = op; return write("ops/"+id, d); };
+function normalizeOp(op){
+  const fix = l => (l||[]).forEach((e,i) => { if (!e.id) e.id = "x" + i; });
+  fix(op.corte?.entregas); (op.costuras||[]).forEach(t => { if (!t.id) t.id = "t" + Math.random().toString(36).slice(2,6); fix(t.entregas); });
+  return op;
+}
+const saveOp = op => { normalizeOp(op); const {id, ...d} = op; const p = write("ops/"+id, d); syncCobrancas(op); return p; };
 const saveLanc = l => { const {id, ...d} = l; return write("lanc/"+id, d); };
 
 /* ---------- cálculos ---------- */
@@ -386,6 +401,7 @@ window.addEventListener("hashchange", () => { const h = location.hash.slice(1); 
 function render(){
   document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.v === S.view ? "page" : "false"));
   const m = $("#main");
+  $("#fab").hidden = !S.ok || S.readonly; $("#tabs").style.visibility = S.ok ? "" : "hidden";
   if (!S.ok){ m.innerHTML = viewLogin(); bindLogin(); return; }
   if (S.erroCarga && !COLS.every(c => S.loaded[c])){ m.innerHTML = `<div class="empty">Não foi possível carregar os dados. Verifique a internet. <button class="btn" id="retry">Tentar de novo</button></div>`; $("#retry").onclick = carregar; return; }
   if (!COLS.every(c => S.loaded[c])){ m.innerHTML = `<div class="empty">Carregando dados da produção…</div>`; return; }
@@ -461,14 +477,43 @@ function hist(items, kind, parte, money){
 }
 
 /* cobranças sugeridas por etapa */
-function etapasCobranca(op, k){
-  const tec = op.retalho ? 0 : pn(op.kg) * pn(op.precoKg);
-  const list = [];
-  if (!op.retalho) list.push({ref:"tecido", cat:"Tecido", desc:`Tecido ${fmt(pn(op.kg),2)} kg × ${brl(pn(op.precoKg))}`, valor:tec, pronto: pn(op.kg)>0});
-  list.push({ref:"corte", cat:"Corte", desc:`Corte ${fmt(k.qtd)} pç × ${brl(k.corteUn)} (${op.corte?.local||"cortador"})`, valor:k.qtd*k.corteUn, pronto:true});
-  k.partes.forEach(t => list.push({ref:"costura:"+t.id, cat:"Costura", desc:`Costura ${t.label} ${t.local||""} · ${fmt(t.q)} pç × ${brl(t.un)}`, valor:t.total, pronto:true}));
-  list.push({ref:"assessoria", cat:"Assessoria", desc:`Assessoria ${fmt(k.qtd)} pç × ${brl(S.cfg.assessoria)}`, valor:k.assessoria, pronto:true});
-  return list.map(e => ({...e, lanc: S.lanc.find(l => l.opId === op.id && l.ref === e.ref)}));
+/* Cobranças automáticas: tecido (ao lançar o pedido com kg), corte (a cada entrega do corte),
+   assessoria (quando o corte termina), costura (a cada entrega da oficina) */
+function cobrancasAuto(op){
+  const out = []; const qtd = pn(op.qtd);
+  if (!op.retalho && pn(op.kg) > 0 && pn(op.precoKg) > 0)
+    out.push({ref:"tecido", cat:"Tecido", data:op.data, valor:r2(pn(op.kg)*pn(op.precoKg)), desc:`Tecido ${fmt(pn(op.kg),2)} kg × ${brl(pn(op.precoKg))}`});
+  const c = op.corte || {}; const un = pn(c.custoUn);
+  let acum = 0, fimCorte = "";
+  [...(c.entregas||[])].sort((a,b)=>(a.data||"").localeCompare(b.data||"")).forEach(e => {
+    const q = pn(e.qtd); if (q <= 0) return; acum += q; if (!fimCorte && qtd && acum >= qtd) fimCorte = e.data;
+    if (un > 0) out.push({ref:"corte:"+e.id, cat:"Corte", data:e.data, valor:r2(q*un), desc:`Corte ${fmt(q)} pç × ${brl(un)} (${c.local||"cortador"})`});
+  });
+  if (fimCorte && S.cfg.assessoria > 0)
+    out.push({ref:"assessoria", cat:"Assessoria", data:fimCorte, valor:r2(acum*S.cfg.assessoria), desc:`Assessoria ${fmt(acum)} pç × ${brl(S.cfg.assessoria)} (corte finalizado)`});
+  (op.costuras||[]).forEach((t,i) => (t.entregas||[]).forEach(e => {
+    const q = pn(e.qtd), u = pn(t.custoUn); if (q <= 0 || u <= 0) return;
+    out.push({ref:`costura:${t.id}:${e.id}`, cat:"Costura", data:e.data, valor:r2(q*u), desc:`Costura T${i+1} ${t.local||""} · ${fmt(q)} pç × ${brl(u)}`});
+  }));
+  return out;
+}
+const autoId = (opId, ref) => "a-" + opId + "-" + ref.replace(/[^A-Za-z0-9_-]/g, "_");
+function syncCobrancas(op){
+  if (S.readonly || !op) return;
+  const ids = new Set();
+  cobrancasAuto(op).forEach(e => {
+    const id = autoId(op.id, e.ref); ids.add(id);
+    const cur = S.lanc.find(l => l.id === id);
+    if (cur && cur.valor === e.valor && cur.data === e.data && cur.desc === e.desc && cur.cat === e.cat) return;
+    saveLanc({id, tipo:"cobranca", auto:true, opId:op.id, ref:e.ref, cat:e.cat, data:e.data, valor:e.valor, desc:e.desc, anexo:null, por:"automático", criadoEm: cur?.criadoEm || new Date().toISOString()});
+  });
+  S.lanc.filter(l => l.auto && l.opId === op.id && !ids.has(l.id)).forEach(l => write("lanc/"+l.id, null));
+}
+function syncTodos(){
+  S.ops.forEach(op => {
+    const antes = JSON.stringify(op); const o = normalizeOp(clone(op));
+    if (JSON.stringify(o) !== antes) saveOp(o); else syncCobrancas(op);
+  });
 }
 const stChip = st => st === "pago" ? `<span class="chip s3">Pago</span>` : st === "parcial" ? `<span class="chip s2">Parcial</span>` : `<span class="chip s1">Pendente</span>`;
 
@@ -478,7 +523,7 @@ function lancRow(l){
   const op = opById(l.opId);
   const st = isRec ? `<span class="chip s3">Recebido</span>` : stChip(F.map[l.id]?.st);
   return `<div class="lanc">${ic}<div><div><b>${esc(isRec ? "Pagamento da Thaty" : l.cat)}</b> <span class="small muted">· ${opCode(op)} · ${fdate(l.data)}</span></div>
-    <div class="small muted">${esc(l.desc||"")}${l.por?` · lançado por ${esc(l.por)}`:""}</div><div class="row" style="gap:6px;margin-top:4px">${st}${anexoHtml(l.anexo)}${S.readonly?"":`<button class="btn sm ghost" data-editl="${esc(l.id)}">Editar</button>`}</div></div>
+    <div class="small muted">${esc(l.desc||"")}${l.por?` · lançado por ${esc(l.por)}`:""}</div><div class="row" style="gap:6px;margin-top:4px">${st}${l.auto?`<span class="chip s0">automático</span>`:""}${anexoHtml(l.anexo)}${S.readonly||l.auto?"":`<button class="btn sm ghost" data-editl="${esc(l.id)}">Editar</button>`}</div></div>
     <div class="val ${isRec?"neg":""}">${isRec?"− ":""}${brl(pn(l.valor))}</div></div>`;
 }
 
@@ -488,7 +533,7 @@ function viewOp(id){
   const st = (l,v,hl) => `<div class="stat ${hl?"hl":""}"><span>${l}</span><b>${v}</b></div>`;
   const ed = !S.readonly;
   const tn = tecidoNecessario(k.prod, k.qtd);
-  const ets = etapasCobranca(op, k);
+  const ets = cobrancasAuto(op).map(e => ({...e, lanc: S.lanc.find(l => l.id === autoId(op.id, e.ref))}));
   const lancs = S.lanc.filter(l => l.opId === op.id).sort((a,b)=>(b.data||"").localeCompare(a.data||""));
   return `<div class="row"><button class="btn ghost" data-back>← Pedidos</button></div>
   <div class="row between"><div><div class="row"><h1>${opCode(op)} · ${esc(k.prod?.nome||"Produto removido")}</h1><span class="chip s${k.st}">${k.stLabel}</span></div>
@@ -496,12 +541,12 @@ function viewOp(id){
     ${ed?`<div class="row"><button class="btn" id="editop">Editar pedido</button><button class="btn" id="fimop">${op.concluida?"Reabrir":"Concluir"}</button><button class="btn danger" id="delop">Excluir</button></div>`:""}</div>
   ${stepsHtml(k)}
 
-  <div class="card"><div class="row between"><h2>Conta deste pedido</h2>${ed?`<div class="row"><button class="btn sm" data-novo="despesa">+ Reembolso</button><button class="btn sm pri" data-novo="recebimento">+ Pagamento da Thaty</button></div>`:""}</div>
+  <div class="card"><div class="row between"><h2>Conta deste pedido</h2>${ed?`<div class="row"><button class="btn sm" data-novo="despesa">+ Serviço / reembolso</button><button class="btn sm pri" data-novo="recebimento">+ Pagamento da Thaty</button></div>`:""}</div>
     <div class="stats">${st("Cobrado", brl(f.cob))}${st("Reembolsos", brl(f.desp))}${st("Pago pela Thaty", brl(f.pago))}${st("Em aberto", brl(f.aberto), f.aberto>0.005)}</div>
-    <h3>Cobranças por etapa</h3>
-    <div>${ets.map(e => `<div class="billrow"><div><b>${e.cat}</b><div class="small muted">${esc(e.desc)}</div></div>
-      <b class="num">${brl(e.lanc ? pn(e.lanc.valor) : e.valor)}</b>
-      <div>${e.lanc ? stChip(S.F.map[e.lanc.id]?.st) : (ed && e.pronto && e.valor>0 ? `<button class="btn sm tape" data-cobrar="${esc(e.ref)}">Cobrar</button>` : `<span class="small muted">${e.pronto?"—":"Lançar kg"}</span>`)}</div></div>`).join("")}</div>
+    <h3>Cobranças automáticas</h3>
+    <div class="small muted">Geradas sozinhas: tecido ao lançar o pedido, corte a cada entrega do cortador, assessoria quando o corte termina e costura a cada entrega da oficina.</div>
+    ${ets.length ? `<div>${ets.map(e => `<div class="billrow"><div><b>${e.cat}</b> <span class="small muted">· ${fdate(e.data)}</span><div class="small muted">${esc(e.desc)}</div></div>
+      <b class="num">${brl(e.valor)}</b><div>${e.lanc ? stChip(S.F.map[e.lanc.id]?.st) : `<span class="small muted">gerando…</span>`}</div></div>`).join("")}</div>` : `<div class="small muted">Nenhuma etapa concluída ainda.</div>`}
     <h3>Lançamentos</h3>
     ${lancs.length ? `<div>${lancs.map(lancRow).join("")}</div>` : `<div class="small muted">Nenhum lançamento ainda.</div>`}
   </div>
@@ -552,7 +597,7 @@ function viewFinanceiro(){
   if (S.fin.tipo && S.fin.tipo !== "todos") ls = ls.filter(l => l.tipo === S.fin.tipo);
   ls.sort((a,b)=>(b.data||"").localeCompare(a.data||"") || (b.criadoEm||"").localeCompare(a.criadoEm||""));
   const pend = S.lanc.filter(l => l.tipo !== "recebimento" && F.map[l.id]?.st !== "pago");
-  return `<div class="row between"><h1>Financeiro</h1>${ed?`<div class="row"><button class="btn" data-novo="cobranca">+ Cobrança</button><button class="btn" data-novo="despesa">+ Reembolso</button><button class="btn pri" data-novo="recebimento">+ Pagamento da Thaty</button></div>`:""}</div>
+  return `<div class="row between"><h1>Financeiro</h1>${ed?`<div class="row"><button class="btn" data-novo="cobranca">+ Cobrança</button><button class="btn" data-novo="despesa">+ Serviço / reembolso</button><button class="btn pri" data-novo="recebimento">+ Pagamento da Thaty</button></div>`:""}</div>
   <div class="kpis">
     <div class="kpi big"><span>Saldo a pagar (Thaty)</span><b>${brl(Math.max(0,F.saldo))}</b><small>${F.credito>0.005?`crédito de ${brl(F.credito)}`:`${pend.length} item(ns) em aberto`}</small></div>
     <div class="kpi"><span>Cobrado (etapas)</span><b>${brl(F.totCob)}</b></div>
@@ -572,12 +617,12 @@ function viewFinanceiro(){
 function lancForm(tipo, l, opIdDefault){
   const novo = !l;
   const cats = tipo === "despesa" ? CAT_DESP : CAT_COB;
-  const titles = {cobranca:"cobrança", despesa:"reembolso", recebimento:"pagamento da Thaty"};
+  const titles = {cobranca:"cobrança", despesa:"serviço / reembolso", recebimento:"pagamento da Thaty"};
   const fields = [
     {name:"opId",label:"Pedido",type:"select",full:true,value:l?.opId ?? opIdDefault ?? "",options:[{v:"",t:"Geral (sem pedido)"}, ...sortedOps().map(o=>({v:o.id,t:`${opCode(o)} · ${produto(o.produtoId)?.nome||""}`}))]},
     ...(tipo !== "recebimento" ? [{name:"cat",label:tipo==="despesa"?"Tipo de gasto":"Etapa",type:"select",value:l?.cat||cats[0],options:cats.map(c=>({v:c,t:c}))}] : []),
     {name:"data",label:"Data",type:"date",value:l?.data||today()},
-    {name:"valor",label:"Valor (R$)",type:"num",value:l?.valor??"", full: tipo==="recebimento"},
+    {name:"valor",label:"Valor (R$)",type:"num",value:l?.valor ?? (tipo==="despesa" ? (padraoServ(cats[0]) || "") : ""), full: tipo==="recebimento"},
     {name:"desc",label:tipo==="recebimento"?"Observação (ex.: PIX)":"Descrição",full:true,value:l?.desc||"",ph:tipo==="despesa"?"Ex.: motoboy corte → oficina Ronald":""},
   ];
   fields.push({name:"arquivo",label:l?.anexo?"Trocar comprovante (opcional)":tipo==="despesa"?"Comprovante (print da corrida, nota, risco)":"Comprovante (opcional)",type:"file",hint:"Foto ou PDF, até 15 MB."});
@@ -593,7 +638,10 @@ function lancForm(tipo, l, opIdDefault){
       saveLanc(rec);
     }});
   const d = $("#dell"); if (d) d.onclick = () => { closeModal(); confirmBox("Excluir este lançamento? O comprovante fica guardado.", () => write("lanc/"+l.id, null)); };
+  const fc = $("#f_cat"), fv = $("#f_valor");
+  if (tipo === "despesa" && fc && fv && !l){ let ult = fv.value; fc.addEventListener("change", () => { const p = padraoServ(fc.value); if (!fv.value || fv.value === ult){ fv.value = p ? String(p).replace(".",",") : ""; ult = fv.value; } }); }
 }
+const padraoServ = cat => cat === "Modelagem" ? pn(S.cfg.modelagem) : 0;
 
 function viewOrcamento(){
   const p = produto(S.orc.prod) || S.produtos[0]; const q = pn(S.orc.qtd);
@@ -636,6 +684,7 @@ function viewCadastros(){
       ${field({name:"corteUn",label:"Valor padrão do corte por peça (R$)",type:"num",value:c.corteUn})}
       ${field({name:"corteLocal",label:"Cortador padrão",value:c.corteLocal})}
       ${field({name:"costuraUn",label:"Valor padrão da costura por peça (R$)",type:"num",value:c.costuraUn})}
+      ${field({name:"modelagem",label:"Valor padrão da modelagem (R$)",type:"num",value:c.modelagem})}
       ${field({name:"perda",label:"Margem de tecido extra no cálculo (%)",type:"num",value:c.perda})}
     </div><div class="row">${ed?`<button class="btn pri" id="savecfg">Salvar configurações</button>`:""}</div>
     <div class="small muted">O custo fixo por peça substitui o “+2,90” da planilha antiga no custo real.</div></div>`;
@@ -698,7 +747,7 @@ function bind(){
   const np = $("#newprod"); if (np) np.onclick = () => prodForm(null);
   document.querySelectorAll("[data-prod]").forEach(b => b.onclick = () => prodForm(produto(b.dataset.prod)));
   const sc = $("#savecfg"); if (sc) sc.onclick = () => {
-    const c = {extra:pn($("#f_extra").value), assessoria:pn($("#f_assessoria").value), corteUn:pn($("#f_corteUn").value), corteLocal:$("#f_corteLocal").value.trim(), costuraUn:pn($("#f_costuraUn").value), perda:pn($("#f_perda").value)};
+    const c = {extra:pn($("#f_extra").value), assessoria:pn($("#f_assessoria").value), corteUn:pn($("#f_corteUn").value), corteLocal:$("#f_corteLocal").value.trim(), costuraUn:pn($("#f_costuraUn").value), perda:pn($("#f_perda").value), modelagem:pn($("#f_modelagem").value)};
     write("config/geral", c); toast("Configurações salvas.");
   };
 
@@ -708,22 +757,14 @@ function bind(){
   const e1 = $("#editop"); if (e1) e1.onclick = () => opForm(op);
   const fim = $("#fimop"); if (fim) fim.onclick = () => upd(o => { o.concluida = !o.concluida; o.dataFinal = o.concluida ? (o.dataFinal || today()) : ""; });
   const del = $("#delop"); if (del) del.onclick = () => {
-    if (S.lanc.some(l => l.opId === op.id)){ toast("Este pedido tem lançamentos financeiros. Exclua-os antes."); return; }
-    confirmBox(`Excluir o pedido ${opCode(op)} com todo o corte e costura?`, () => { write("ops/"+op.id, null); go("producoes"); });
+    if (S.lanc.some(l => l.opId === op.id && !l.auto)){ toast("Este pedido tem pagamentos ou reembolsos lançados. Exclua-os antes."); return; }
+    confirmBox(`Excluir o pedido ${opCode(op)} com todo o corte, costura e cobranças automáticas?`, () => { S.lanc.filter(l => l.opId === op.id && l.auto).forEach(l => write("lanc/"+l.id, null)); write("ops/"+op.id, null); go("producoes"); });
   };
   const ec = $("#editcorte"); if (ec) ec.onclick = () => form({title:"Corte C"+op.num, fields:[
     {name:"local",label:"Cortador",value:op.corte?.local||"",list:locais(),full:true},
     {name:"custoUn",label:"Valor do corte por peça (R$)",type:"num",value:op.corte?.custoUn??S.cfg.corteUn,full:true}],
     onSave: v => upd(o => { o.corte.local = v.local; o.corte.custoUn = v.custoUn; }) });
   const k = calc(op);
-  document.querySelectorAll("[data-cobrar]").forEach(b => b.onclick = () => {
-    const e = etapasCobranca(op, k).find(x => x.ref === b.dataset.cobrar); if (!e) return;
-    form({title:`Cobrar ${e.cat} · ${opCode(op)}`, fields:[
-      {name:"data",label:"Data",type:"date",value:today()},
-      {name:"valor",label:"Valor (R$)",type:"num",value:r2(e.valor)},
-      {name:"desc",label:"Descrição",full:true,value:e.desc}], saveLabel:"Lançar cobrança",
-      onSave: v => { if (!v.valor) return "Informe o valor."; saveLanc({id:"l"+uid(), por:S.user, tipo:"cobranca", opId:op.id, ref:e.ref, cat:e.cat, data:v.data, valor:r2(v.valor), desc:v.desc, anexo:null, criadoEm:new Date().toISOString()}); }});
-  });
   const ap = $("#addparte"); if (ap) ap.onclick = () => parteForm(op, null, k.aEnviar);
   document.querySelectorAll("[data-editparte]").forEach(b => b.onclick = () => parteForm(op, +b.dataset.editparte));
   document.querySelectorAll("[data-delparte]").forEach(b => b.onclick = () => confirmBox(`Excluir a parte T${+b.dataset.delparte+1} com entregas e pagamentos?`, () => upd(o => o.costuras.splice(+b.dataset.delparte,1))));
@@ -741,7 +782,7 @@ function bind(){
     form({title:titles[kind], fields,
       onSave: v => { if (!(money ? v.valor : v.qtd) && !(kind==="ec" && v.defeitos)) return "Informe um valor maior que zero."; upd(o => {
         const list = kind==="ce" ? (o.corte.entregas ||= []) : kind==="cp" ? (o.corte.pagamentos ||= []) : kind==="te" ? (o.costuras[+p].entregas ||= []) : kind==="tp" ? (o.costuras[+p].pagamentos ||= []) : o.entregasCliente;
-        list.push(v); list.sort((a,b)=>a.data.localeCompare(b.data)); }); } });
+        list.push({id:uid(), ...v}); list.sort((a,b)=>a.data.localeCompare(b.data)); }); } });
   });
   document.querySelectorAll("[data-delh]").forEach(b => b.onclick = () => {
     const [kind, p, i] = b.dataset.delh.split("|");
@@ -829,12 +870,12 @@ function bindLogin(){
     const pin = $("#pin").value.trim(); if (!pin) return;
     $("#entrar").disabled = true; $("#entrar").textContent = "Entrando…"; $("#lerr").textContent = "";
     S.pin = pin;
-    try { const j = await api("login"); S.user = j.nome; S.ok = true; store.set("pt_pin", pin); entrou(); }
+    try { const j = await api("login"); S.user = j.nome; S.ok = true; store.set("pt_pin", pin); store.set("pt_user", j.nome); entrou(); }
     catch(e){ S.pin = ""; $("#lerr").textContent = e.message === "PIN inválido" ? "PIN incorreto." : "Sem conexão com o servidor. Tente de novo."; $("#entrar").disabled = false; $("#entrar").textContent = "Entrar"; }
   };
   $("#entrar").onclick = go_; $("#pin").onkeydown = e => { if (e.key === "Enter") go_(); }; $("#pin").focus();
 }
-function sair(){ store.set("pt_pin", null); S.ok = false; S.pin = ""; S.user = ""; COLS.forEach(c => S.loaded[c] = false); $("#who").hidden = true; render(); }
+function sair(){ store.set("pt_pin", null); store.set("pt_user", null); store.set("pt_cache", null); S.ok = false; S.pin = ""; S.user = ""; COLS.forEach(c => S.loaded[c] = false); $("#who").hidden = true; render(); }
 function entrou(){
   const w = $("#who"); w.hidden = false; w.textContent = S.user + " · sair"; w.onclick = () => sair();
   render(); carregar();
@@ -847,6 +888,7 @@ async function carregar(){
     COLS.forEach(c => { S[c] = j.data[c] || []; S.loaded[c] = true; });
     const g = (j.data.config || []).find(x => x.id === "geral"); S.cfg = {...DEF_CFG, ...(g || {})}; delete S.cfg.id;
     S.rev = j.rev; S.erroCarga = false; setSync("Sincronizado");
+    salvarCache(); syncTodos();
   } catch(e){ S.erroCarga = true; setSync("Sem conexão"); }
   if (!$("#modal-root").innerHTML) render(); else S.pending = true;
 }
@@ -856,11 +898,18 @@ async function checar(){
 }
 document.addEventListener("visibilitychange", () => { if (!document.hidden) checar(); });
 new MutationObserver(() => { if (!$("#modal-root").innerHTML && S.pending){ S.pending = false; render(); } }).observe($("#modal-root"), {childList:true});
+$("#fab").onclick = () => lancForm("despesa", null, S.view === "producoes" && S.opId ? S.opId : "");
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 (function init(){
   const h = location.hash.slice(1); if (VIEWS.includes(h)) S.view = h;
   const p = store.get("pt_pin");
-  if (p){ S.pin = p; S.ok = true; api("login").then(j => { S.user = j.nome; entrou(); }).catch(e => { if (e.message !== "PIN inválido"){ S.user = ""; entrou(); } }); }
+  if (p){
+    S.pin = p; S.ok = true; S.user = store.get("pt_user") || "";
+    if (store.get("pt_pin_prev") !== p){ store.set("pt_cache", null); store.set("pt_pin_prev", p); }
+    if (lerCache()) setSync("Atualizando…");
+    entrou();
+    if (!S.user) api("login").then(j => { S.user = j.nome; store.set("pt_user", j.nome); const w = $("#who"); if (w) w.textContent = S.user + " · sair"; }).catch(() => {});
+  }
   render();
 })();
 </script>
