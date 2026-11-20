@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Produção Thaty ✨</title>
-<meta name="theme-color" content="#f3f4f7">
+<meta name="theme-color" content="#2f4a8a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Produção">
 <link rel="manifest" href="manifest.json">
@@ -43,17 +43,17 @@ button,input,select{font:inherit;color:inherit}
 a{color:var(--accent)}
 :focus-visible{outline:2px solid var(--tape);outline-offset:2px}
 
-header.top{position:sticky;top:0;padding-top:env(safe-area-inset-top);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+header.top{position:sticky;top:0;padding-top:env(safe-area-inset-top);z-index:5;background:#2f4a8a;color:#fff}
 .top-in{max-width:1100px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:16px}
 .brand{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-size:22px;font-weight:700}
 .brand i{width:10px;height:26px;background:var(--tape);border-radius:2px;display:block}
 nav.tabs{display:flex;gap:4px;margin-left:auto}
-nav.tabs button{border:0;background:none;padding:8px 12px;border-radius:8px;cursor:pointer;color:var(--muted);font-weight:500}
-nav.tabs button[aria-current="page"]{background:var(--accent);color:var(--accent-ink)}
-.sync{font-size:12px;color:var(--muted)}
+nav.tabs button{border:0;background:none;padding:8px 12px;border-radius:8px;cursor:pointer;color:rgba(255,255,255,.72);font-weight:500}
+nav.tabs button[aria-current="page"]{background:var(--tape);color:#fff;font-weight:600}
+.sync{font-size:12px;color:rgba(255,255,255,.72)}
 main{max-width:1100px;margin:0 auto;padding:18px 16px 96px;display:flex;flex-direction:column;gap:16px}
 @media (max-width:760px){
-  nav.tabs{position:fixed;bottom:0;left:0;right:0;margin:0;background:var(--surface);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom));justify-content:space-around;z-index:6;background:var(--bg)}
+  nav.tabs{position:fixed;bottom:0;left:0;right:0;margin:0;background:var(--surface);border-top:0;padding:6px 4px calc(6px + env(safe-area-inset-bottom));justify-content:space-around;z-index:6;background:#2f4a8a}
   nav.tabs button{flex:1;padding:10px 2px;font-size:12px}
   .sync{margin-left:auto}
 }
@@ -151,7 +151,7 @@ tfoot td{font-weight:600;border-bottom:0}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;background:var(--ink);color:var(--surface);padding:10px 16px;border-radius:10px;font-size:14px;z-index:30;max-width:90%}
 .login{max-width:340px;margin:12vh auto 0;display:flex;flex-direction:column;gap:14px;text-align:center}
 .login input{font-size:28px;letter-spacing:.4em;text-align:center;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px}
-.who{font-size:12px;color:var(--muted);cursor:pointer;border:0;background:none}
+.who{font-size:12px;color:rgba(255,255,255,.85);cursor:pointer;border:0;background:none}
 .fab{position:fixed;right:16px;bottom:24px;z-index:8;display:flex;align-items:center;gap:8px;background:var(--tape);color:#fff;border:0;border-radius:999px;padding:12px 18px;font-weight:600;box-shadow:0 4px 14px rgba(224,103,154,.35);cursor:pointer}
 .fab[hidden]{display:none}
 @media (max-width:760px){.fab{bottom:calc(76px + env(safe-area-inset-bottom))}}
