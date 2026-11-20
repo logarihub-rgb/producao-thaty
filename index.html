@@ -484,12 +484,12 @@ function opCard(op){
   return `<button class="op" data-op="${esc(op.id)}">
     <div class="row between"><div class="row" style="gap:8px"><span class="code">${opCode(op)}</span><div><b>${esc(k.prod?.nome || "Produto removido")}</b><div class="small muted">${fmt(k.qtd)} peças · ${fdate(op.data)}</div></div></div></div>
     ${fl.html}${fl.next}
-    <div class="row between small"><span class="muted">Thaty deve deste pedido</span><b class="num" style="color:${f.aberto>0.005?"var(--bad)":"var(--ok)"}">${brl(Math.max(0,f.aberto))}</b></div>
+    <div class="row between small"><span class="muted">Valor em aberto do pedido</span><b class="num" style="color:${f.aberto>0.005?"var(--bad)":"var(--ok)"}">${brl(Math.max(0,f.aberto))}</b></div>
   </button>`;
 }
 function heroThaty(){
   const F = S.F; const ab = Math.max(0, F.aberto);
-  return `<div class="hero"><div><span>A Thaty deve</span><b>${brl(ab)}</b><small>${F.despAberto>0.005?`inclui ${brl(F.despAberto)} de serviços a reembolsar`:"tudo em dia nos reembolsos"}${F.credito>0.005?` · sobra a favor dela ${brl(F.credito)}`:""}</small></div>${S.view!=="financeiro"?`<button class="btn" data-goto="financeiro">Ver financeiro →</button>`:""}</div>`;
+  return `<div class="hero"><div><span>Valor em aberto</span><b>${brl(ab)}</b><small>${F.despAberto>0.005?`inclui ${brl(F.despAberto)} de serviços a reembolsar`:"tudo em dia nos reembolsos"}${F.credito>0.005?` · sobra a favor dela ${brl(F.credito)}`:""}</small></div>${S.view!=="financeiro"?`<button class="btn" data-goto="financeiro">Ver financeiro →</button>`:""}</div>`;
 }
 function viewProducoes(){
   const all = sortedOps().map(o => ({o, k:calc(o)}));
@@ -518,7 +518,7 @@ function hist(items, kind, parte, money){
 
 /* cobranças sugeridas por etapa */
 /* Cobranças automáticas: tecido (ao lançar o pedido com kg), corte (a cada entrega do corte),
-   assessoria (quando o corte termina), costura (a cada entrega da oficina) */
+   assessoria (quando as peças são entregues), costura (a cada entrega da oficina) */
 function cobrancasAuto(op){
   const out = []; const qtd = pn(op.qtd);
   if (!op.retalho && pn(op.kg) > 0 && pn(op.precoKg) > 0)
@@ -529,11 +529,11 @@ function cobrancasAuto(op){
     const q = pn(e.qtd); if (q <= 0) return; acum += q; if (!fimCorte && qtd && acum >= qtd) fimCorte = e.data;
     if (un > 0) out.push({ref:"corte:"+e.id, cat:"Corte", data:e.data, valor:r2(q*un), desc:`Corte ${fmt(q)} pç × ${brl(un)} (${c.local||"cortador"})`});
   });
-  if (fimCorte && S.cfg.assessoria > 0)
-    out.push({ref:"assessoria", cat:"Assessoria", data:fimCorte, valor:r2(acum*S.cfg.assessoria), desc:`Assessoria ${fmt(acum)} pç × ${brl(S.cfg.assessoria)} (corte finalizado)`});
+  const ass = pn(S.cfg.assessoria);
   (op.costuras||[]).forEach((t,i) => (t.entregas||[]).forEach(e => {
-    const q = pn(e.qtd), u = pn(t.custoUn); if (q <= 0 || u <= 0) return;
-    out.push({ref:`costura:${t.id}:${e.id}`, cat:"Costura", data:e.data, valor:r2(q*u), desc:`Costura T${i+1} ${t.local||""} · ${fmt(q)} pç × ${brl(u)}`});
+    const q = pn(e.qtd), u = pn(t.custoUn); if (q <= 0) return;
+    if (u > 0) out.push({ref:`costura:${t.id}:${e.id}`, cat:"Costura", data:e.data, valor:r2(q*u), desc:`Costura T${i+1} ${t.local||""} · ${fmt(q)} pç × ${brl(u)}`});
+    if (ass > 0) out.push({ref:`assessoria:${t.id}:${e.id}`, cat:"Assessoria", data:e.data, valor:r2(q*ass), desc:`Assessoria ${fmt(q)} pç entregues × ${brl(ass)}`});
   }));
   return out;
 }
@@ -614,7 +614,7 @@ function viewOp(id){
 
   <div class="card"><div class="row between"><h2>Conta deste pedido</h2>${ed?`<button class="btn sm" data-serv="${esc(op.id)}">+ Serviço</button>`:""}</div>
     ${contaHtml(S.lanc.filter(l => l.opId === op.id), op.id)}
-    <div class="small muted">Cobrança automática: tecido ao lançar, corte e costura a cada entrega, assessoria quando o corte termina.</div>
+    <div class="small muted">Cobrança automática: tecido ao lançar, corte e costura a cada entrega, assessoria quando as peças são entregues.</div>
   </div>
 
   <details class="mini"><summary>Mais opções do pedido</summary><div class="card" style="margin-top:8px">
@@ -652,7 +652,7 @@ function viewFinanceiro(){
   return `${fo === "todas" ? heroThaty() : ""}
   <div class="row between"><h1>Financeiro</h1>${ed?`<div class="row"><button class="btn" data-novo="recebimento">+ Pagamento</button><button class="btn" data-novo="despesa">+ Serviço</button></div>`:""}</div>
   <div class="field"><label for="finop">Ver</label><select id="finop"><option value="todas">Todos os pedidos</option><option value="geral" ${fo==="geral"?"selected":""}>Geral (sem pedido)</option>${sortedOps().map(o=>`<option value="${esc(o.id)}" ${fo===o.id?"selected":""}>${opCode(o)} · ${esc(produto(o.produtoId)?.nome||"")}</option>`).join("")}</select></div>
-  <div class="card"><h2>O que a Thaty paga</h2><div class="small muted">Toque na sessão para ver os detalhes.</div>${contaHtml(ls, opIdF)}</div>
+  <div class="card"><h2>Valor por sessão</h2><div class="small muted">Toque na sessão para ver os detalhes.</div>${contaHtml(ls, opIdF)}</div>
   <div class="card"><h2>Pagamentos da Thaty</h2>${recs.length ? recs.map(lancRow).join("") : `<div class="small muted">Nenhum pagamento lançado.</div>`}</div>
   ${ed && fo === "todas" ? oficinasResumo(S.ops.map(o => ({o, k:calc(o)}))) : ""}`;
 }
