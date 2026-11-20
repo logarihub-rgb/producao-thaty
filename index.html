@@ -55,7 +55,10 @@ main{max-width:1100px;margin:0 auto;padding:18px 16px 96px;display:flex;flex-dir
 @media (max-width:760px){
   nav.tabs{position:fixed;bottom:0;left:0;right:0;margin:0;background:var(--surface);border-top:0;padding:6px 4px calc(6px + env(safe-area-inset-bottom));justify-content:space-around;z-index:6;background:#2f4a8a}
   nav.tabs button{flex:1;padding:10px 2px;font-size:12px}
-  .sync{margin-left:auto}
+  .sync{margin-left:auto;font-size:11px}
+  .brand{font-size:18px;white-space:nowrap}
+  .top-in{gap:8px}
+  .who{font-size:11px}
 }
 
 .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px}
@@ -155,6 +158,49 @@ tfoot td{font-weight:600;border-bottom:0}
 .fab{position:fixed;right:16px;bottom:24px;z-index:8;display:flex;align-items:center;gap:8px;background:var(--tape);color:#fff;border:0;border-radius:999px;padding:12px 18px;font-weight:600;box-shadow:0 4px 14px rgba(224,103,154,.35);cursor:pointer}
 .fab[hidden]{display:none}
 @media (max-width:760px){.fab{bottom:calc(76px + env(safe-area-inset-bottom))}}
+
+/* fluxo */
+.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin:4px 0}
+.fs{display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;position:relative;font-size:12px;color:var(--muted);min-width:0}
+.fs:not(:last-child)::after{content:"";position:absolute;top:14px;left:calc(50% + 17px);right:calc(-50% + 17px);height:3px;border-radius:2px;background:var(--line)}
+.fs.done:not(:last-child)::after{background:var(--accent)}
+.fs i{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-weight:700;font-size:13px;background:var(--surface);border:2px solid var(--line);color:var(--muted)}
+.fs.done i{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.fs.now i{border-color:var(--tape);color:var(--tape);background:var(--tape-soft)}
+.fs.now,.fs.done{color:var(--ink)}
+.fs.now b{color:var(--tape)}
+.fs b{font-size:12px;font-weight:600}
+.fs small{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.next{display:flex;gap:8px;align-items:center;background:var(--tape-soft);color:var(--ink);border-radius:10px;padding:9px 12px;font-size:14px}
+.next b{color:var(--tape)}
+.next.ok{background:var(--ok-soft)} .next.ok b{color:var(--ok)}
+.hero{background:#2f4a8a;color:#fff;border-radius:14px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.hero span{font-size:13px;opacity:.85}
+.hero b{display:block;font-family:var(--font-display);font-size:34px;font-weight:700;line-height:1.1}
+.hero small{display:block;font-size:12px;opacity:.85}
+.hero .btn{background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.3)}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+.bar>b{display:block;height:100%;background:var(--accent);border-radius:4px}
+.step{display:grid;grid-template-columns:34px 1fr;gap:12px}
+.step>i{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-weight:700;background:var(--line);color:var(--muted)}
+.step.done>i{background:var(--accent);color:var(--accent-ink)}
+.step.now>i{background:var(--tape);color:#fff}
+.step>div{display:flex;flex-direction:column;gap:8px;min-width:0}
+.step h2{font-size:20px}
+.oft{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+details.mini>summary{cursor:pointer;font-size:13px;color:var(--muted);list-style:none}
+details.mini>summary::before{content:"▸ "} details.mini[open]>summary::before{content:"▾ "}
+.conta{display:flex;flex-direction:column}
+.conta .h,.conta summary{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--line)}
+.conta .h{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding-top:0}
+.conta summary{list-style:none;cursor:pointer}
+.conta summary b{font-weight:600}
+.conta .v{text-align:right;font-variant-numeric:tabular-nums;min-width:92px}
+.conta .ab{color:var(--bad);font-weight:700}
+.conta .zero{color:var(--ok);font-weight:600}
+.conta .tot{display:grid;grid-template-columns:1fr auto auto;gap:10px;padding:10px 4px;font-weight:700}
+.conta details>div{padding:4px 4px 10px;background:var(--bg);border-radius:0 0 8px 8px}
+.conta .pg{grid-column:1/-1;justify-self:end}
 details.sec>summary{list-style:none;cursor:pointer;display:flex;flex-direction:column;gap:10px}
 details.sec>summary::-webkit-details-marker{display:none}
 details.sec>summary h2::after{content:" ▾";font-size:14px;color:var(--muted)}
@@ -167,11 +213,9 @@ details.sec:not([open])>summary h2::after{content:" ▸"}
 <header class="top"><div class="top-in">
   <div class="brand"><i></i>Produção Thaty ✨</div>
   <nav class="tabs" id="tabs">
-    <button data-v="painel">Painel</button>
-    <button data-v="producoes">Produções</button>
+    <button data-v="producoes">Pedidos</button>
     <button data-v="financeiro">Financeiro</button>
-    <button data-v="orcamento">Orçamento</button>
-    <button data-v="cadastros">Cadastros</button>
+    <button data-v="mais">Mais</button>
   </nav>
   <span class="sync" id="sync">Conectando…</span><button class="who" id="who" hidden></button>
 </div></header>
@@ -182,10 +226,10 @@ details.sec:not([open])>summary h2::after{content:" ▸"}
 <script src="config.js"></script>
 <script>
 const DEF_CFG = {extra:2.9, assessoria:1.2, corteUn:0.4, corteLocal:"THÁSSIO", costuraUn:2.8, perda:0, modelagem:95};
-const VIEWS = ["painel","producoes","financeiro","orcamento","cadastros"];
+const VIEWS = ["producoes","financeiro","mais"];
 const COLS = ["insumos","produtos","ops","lanc"];
 const API = window.PT_API || "";
-const S = {pin:"", user:"", ok:false, insumos:[], produtos:[], ops:[], lanc:[], cfg:{...DEF_CFG}, loaded:{}, view:"painel", opId:null, sub:"insumos", orc:{prod:"",qtd:""}, fin:{op:"todas"}, readonly:false};
+const S = {pin:"", user:"", ok:false, insumos:[], produtos:[], ops:[], lanc:[], cfg:{...DEF_CFG}, loaded:{}, view:"producoes", opId:null, sub:"insumos", orc:{prod:"",qtd:""}, fin:{op:"todas"}, readonly:false};
 const CAT_COB = ["Tecido","Corte","Costura","Assessoria","Outro"];
 const CAT_DESP = ["Modelagem","Pilotagem","Impressão de risco","Frete motoboy","Carreto","Outro"];
 
@@ -258,8 +302,8 @@ function finance(){
     .sort((a,b) => (a.data||"").localeCompare(b.data||"") || (a.criadoEm||"").localeCompare(b.criadoEm||""));
   const rec = S.lanc.filter(l => l.tipo === "recebimento").sort((a,b)=>(a.data||"").localeCompare(b.data||""));
   const apply = (list, val) => { for (const d of list){ if (val <= 0.0001) break; const f = pn(d.valor) - d.pago; if (f <= 0) continue; const x = Math.min(f, val); d.pago += x; val -= x; } return val; };
-  let sobra = 0;
-  rec.filter(r => r.secao).forEach(r => { sobra += apply(deb.filter(d => (!r.opId || d.opId === r.opId) && secaoDe(d) === r.secao), pn(r.valor)); });
+  let sobra = 0, sobraSec = 0;
+  rec.filter(r => r.secao).forEach(r => { sobraSec += apply(deb.filter(d => (!r.opId || d.opId === r.opId) && secaoDe(d) === r.secao), pn(r.valor)); });
   rec.filter(r => !r.secao && r.opId).forEach(r => { sobra += apply(deb.filter(d => d.opId === r.opId), pn(r.valor)); });
   sobra += sum(rec.filter(r => !r.secao && !r.opId), r => pn(r.valor));
   sobra = apply(deb, sobra);
@@ -268,8 +312,8 @@ function finance(){
   const totCob = sum(deb.filter(d=>d.tipo==="cobranca"), d=>pn(d.valor));
   const totDesp = sum(deb.filter(d=>d.tipo==="despesa"), d=>pn(d.valor));
   const totRec = sum(rec, r=>pn(r.valor));
-  return {map, totCob, totDesp, totRec, saldo: totCob + totDesp - totRec, credito: Math.max(0, sobra),
-    despAberto: sum(deb.filter(d=>d.tipo==="despesa"), d=>pn(d.valor)-d.pago)};
+  return {map, totCob, totDesp, totRec, saldo: totCob + totDesp - totRec, credito: Math.max(0, sobra) + sobraSec,
+    despAberto: sum(deb.filter(d=>d.tipo==="despesa"), d=>pn(d.valor)-d.pago), aberto: sum(deb, d=>pn(d.valor)-d.pago)};
 }
 function finOp(opId, F){
   const ls = S.lanc.filter(l => l.opId === opId);
@@ -410,49 +454,51 @@ function render(){
   if (!COLS.every(c => S.loaded[c])){ m.innerHTML = `<div class="empty">Carregando dados da produção…</div>`; return; }
   S.F = finance();
   const ro = S.readonly ? `<div class="note">Você está vendo em modo leitura: sua conta não tem permissão para editar.</div>` : "";
-  const html = S.view === "painel" ? viewPainel()
-    : S.view === "producoes" ? (S.opId ? viewOp(S.opId) : viewProducoes())
-    : S.view === "financeiro" ? viewFinanceiro()
-    : S.view === "orcamento" ? viewOrcamento() : viewCadastros();
-  m.innerHTML = (S.view === "orcamento" ? "" : ro) + html;
+  const html = S.view === "financeiro" ? viewFinanceiro()
+    : S.view === "mais" ? viewMais()
+    : (S.opId ? viewOp(S.opId) : viewProducoes());
+  m.innerHTML = ro + html;
   bind();
 }
 
-function stepsHtml(k){
-  const lb = ["Tecido","Corte","Costura","Entregue"];
-  return `<div><div class="steps">${k.etapa.map(e=>`<div class="${e===2?"on":e===1?"half":""}"></div>`).join("")}</div><div class="steplbl">${lb.map(l=>`<span>${l}</span>`).join("")}</div></div>`;
+function fluxo(op, k){
+  const q = k.qtd;
+  const done = [k.etapa[0] === 2, q && k.cortado >= q, q && k.enviado >= q, op.concluida || (q && k.costurado >= q)];
+  const cur = done.findIndex(d => !d);
+  const subs = [op.retalho ? "retalho" : pn(op.kg) ? fmt(pn(op.kg),0)+" kg" : "falta",
+    `${fmt(k.cortado)}/${fmt(q)}`, `${fmt(k.enviado)}/${fmt(q)}`, `${fmt(k.costurado)}/${fmt(q)}`];
+  const nomes = ["Tecido","Corte","Costura","Entregue"];
+  const html = `<div class="flow">${nomes.map((n,i)=>`<div class="fs ${done[i]?"done":i===cur?"now":""}"><i>${done[i]?"✓":i+1}</i><b>${n}</b><small>${subs[i]}</small></div>`).join("")}</div>`;
+  let nx, ok = false;
+  const ofs = k.partes.filter(t => t.aEntregar > 0).map(t => (t.local||"oficina").toUpperCase());
+  if (!done[0]) nx = `Próximo: <b>lançar o tecido comprado</b>`;
+  else if (k.aCortar > 0) nx = k.cortado ? `No corte: <b>faltam ${fmt(k.aCortar)} pç</b> (${esc(op.corte?.local||"cortador")})` : `Próximo: <b>mandar para o corte</b> (${esc(op.corte?.local||"cortador")})`;
+  else if (k.aEnviar > 0) nx = `Próximo: <b>enviar ${fmt(k.aEnviar)} pç para oficina</b>`;
+  else if (k.naCostura > 0) nx = `Na oficina: <b>${fmt(k.naCostura)} pç</b> (${esc([...new Set(ofs)].join(", "))})`;
+  else if (!op.concluida && q && k.costurado >= q){ nx = `<b>Tudo entregue</b> · pode concluir o pedido`; ok = true; }
+  else { nx = `<b>Pedido concluído</b>`; ok = true; }
+  return {html, next:`<div class="next ${ok?"ok":""}">${nx}</div>`, cur};
 }
 function opCard(op){
-  const k = calc(op); const f = finOp(op.id, S.F);
+  const k = calc(op); const f = finOp(op.id, S.F); const fl = fluxo(op, k);
   return `<button class="op" data-op="${esc(op.id)}">
-    <div class="row between"><span class="code">${opCode(op)}</span><span class="chip s${k.st}">${k.stLabel}</span></div>
-    <div><b>${esc(k.prod?.nome || "Produto removido")}</b><div class="small muted">Início ${fdate(op.data)} · ${fmt(k.qtd)} peças${op.retalho?" · retalho":""}</div></div>
-    ${stepsHtml(k)}
-    <div class="row between small"><span class="muted">Cortado ${fmt(k.cortado)} · Entregue ${fmt(k.costurado)} de ${fmt(k.qtd)}</span></div>
-    <div class="row between small"><span class="muted">Em aberto da Thaty</span><b class="num" style="color:${f.aberto>0.005?"var(--bad)":"var(--ok)"}">${brl(f.aberto)}</b></div>
+    <div class="row between"><div class="row" style="gap:8px"><span class="code">${opCode(op)}</span><div><b>${esc(k.prod?.nome || "Produto removido")}</b><div class="small muted">${fmt(k.qtd)} peças · ${fdate(op.data)}</div></div></div></div>
+    ${fl.html}${fl.next}
+    <div class="row between small"><span class="muted">Thaty deve deste pedido</span><b class="num" style="color:${f.aberto>0.005?"var(--bad)":"var(--ok)"}">${brl(Math.max(0,f.aberto))}</b></div>
   </button>`;
 }
-
-function viewPainel(){
-  const F = S.F;
-  const all = S.ops.map(o => ({o, k:calc(o)}));
-  const ab = all.filter(x => x.k.aberta);
-  const t = f => sum(ab, x => f(x.k));
-  const kpi = (l,v,s,cls) => `<div class="kpi ${cls||""}"><span>${l}</span><b>${v}</b>${s?`<small>${s}</small>`:""}</div>`;
-  return `<div class="row between"><h1>Painel da produção</h1>${S.readonly?"":`<button class="btn pri" id="newop">+ Novo pedido</button>`}</div>
-  <div class="kpis">
-    ${kpi("Saldo a pagar (Thaty)", brl(Math.max(0,F.saldo)), F.credito>0.005?`crédito de ${brl(F.credito)}`:"cobranças + reembolsos − pagos", "big")}
-    ${kpi("Reembolsos em aberto", brl(F.despAberto), "fretes, riscos, modelagem", F.despAberto>0.005?"alert":"")}
-    ${kpi("Pedidos abertos", fmt(ab.length), fmt(t(k=>k.qtd))+" peças")}
-    ${kpi("Falta cortar", fmt(t(k=>k.aCortar)), "peças", t(k=>k.aCortar)>0?"alert":"")}
-    ${kpi("Na costura", fmt(t(k=>k.naCostura)), "peças com oficinas", t(k=>k.naCostura)>0?"alert":"")}
-    ${kpi("Entregue à Thaty", fmt(sum(all, x => x.k.costurado)), "peças vindas das oficinas")}
-  </div>
-  <h2>Em andamento</h2>
-  ${ab.length ? `<div class="oplist">${ab.sort((a,b)=>b.o.num-a.o.num).map(x=>opCard(x.o)).join("")}</div>` : `<div class="empty">Nenhum pedido aberto. Crie um em “+ Novo pedido”.</div>`}
-  ${oficinasResumo(all)}`;
+function heroThaty(){
+  const F = S.F; const ab = Math.max(0, F.aberto);
+  return `<div class="hero"><div><span>A Thaty deve</span><b>${brl(ab)}</b><small>${F.despAberto>0.005?`inclui ${brl(F.despAberto)} de serviços a reembolsar`:"tudo em dia nos reembolsos"}${F.credito>0.005?` · sobra a favor dela ${brl(F.credito)}`:""}</small></div>${S.view!=="financeiro"?`<button class="btn" data-goto="financeiro">Ver financeiro →</button>`:""}</div>`;
 }
-
+function viewProducoes(){
+  const all = sortedOps().map(o => ({o, k:calc(o)}));
+  const ab = all.filter(x => x.k.aberta), fe = all.filter(x => !x.k.aberta);
+  return `${heroThaty()}
+  <div class="row between"><h1>Pedidos</h1>${S.readonly?"":`<button class="btn pri" id="newop">+ Novo pedido</button>`}</div>
+  ${ab.length ? `<div class="oplist">${ab.map(x=>opCard(x.o)).join("")}</div>` : `<div class="empty">Nenhum pedido em andamento.</div>`}
+  ${fe.length ? `<details class="mini"><summary>Pedidos entregues (${fe.length})</summary><div class="oplist" style="margin-top:10px">${fe.map(x=>opCard(x.o)).join("")}</div></details>` : ""}`;
+}
 function oficinasResumo(all){
   const map = {};
   all.forEach(x => {
@@ -462,18 +508,9 @@ function oficinasResumo(all){
   });
   const rows = Object.values(map).filter(r => r.pend || r.aPagar);
   if (!rows.length) return "";
-  return `<div class="card"><h2>Cortador e oficinas</h2><div class="tbl-wrap"><table><thead><tr><th>Quem</th><th>Etapa</th><th class="r">Peças a entregar</th><th class="r">A pagar a eles</th></tr></thead><tbody>
-  ${rows.map(r=>`<tr><td>${esc(r.n)}</td><td>${r.tipo}</td><td class="r">${fmt(r.pend)}</td><td class="r">${brl(r.aPagar)}</td></tr>`).join("")}</tbody></table></div></div>`;
+  return `<div class="card"><h2>Você paga: cortador e oficinas</h2><div class="tbl-wrap"><table><thead><tr><th>Quem</th><th class="r">Peças com eles</th><th class="r">A pagar</th></tr></thead><tbody>
+  ${rows.map(r=>`<tr><td>${esc(r.n)} <span class="small muted">· ${r.tipo}</span></td><td class="r">${fmt(r.pend)}</td><td class="r">${brl(r.aPagar)}</td></tr>`).join("")}</tbody></table></div></div>`;
 }
-
-function viewProducoes(){
-  const f = S.filtro || "abertas";
-  let list = sortedOps(); if (f === "abertas") list = list.filter(o => calc(o).aberta); if (f === "concluidas") list = list.filter(o => !calc(o).aberta);
-  return `<div class="row between"><h1>Pedidos de produção</h1>${S.readonly?"":`<button class="btn pri" id="newop">+ Novo pedido</button>`}</div>
-  <div class="subtabs" id="filtro">${[["abertas","Abertos"],["concluidas","Entregues"],["todas","Todos"]].map(([v,t])=>`<button data-f="${v}" aria-pressed="${f===v}">${t}</button>`).join("")}</div>
-  ${list.length ? `<div class="oplist">${list.map(opCard).join("")}</div>` : `<div class="empty">Nada por aqui.</div>`}`;
-}
-
 function hist(items, kind, parte, money){
   if (!items || !items.length) return `<div class="small muted">Nenhum lançamento.</div>`;
   return `<div class="hist">${items.map((e,i)=>`<div><span class="muted">${fdate(e.data)}</span><b class="num">${money?brl(pn(e.valor)):fmt(pn(e.qtd))+" pç"}</b>${pn(e.defeitos)?`<span class="chip s4">${fmt(pn(e.defeitos))} c/ defeito</span>`:""}${e.obs?`<span class="small muted">${esc(e.obs)}</span>`:""}${S.readonly?"":`<button class="x" aria-label="Excluir lançamento" data-delh="${kind}|${parte}|${i}">×</button>`}</div>`).join("")}</div>`;
@@ -526,102 +563,104 @@ function lancRow(l){
   const op = opById(l.opId);
   const st = isRec ? `<span class="chip s3">Recebido</span>` : stChip(F.map[l.id]?.st);
   return `<div class="lanc">${ic}<div><div><b>${esc(isRec ? "Pagamento" + (l.secao ? " · " + (SECOES.find(x => x[0] === l.secao)?.[1] || "") : "") : l.cat)}</b> <span class="small muted">· ${opCode(op)} · ${fdate(l.data)}</span></div>
-    <div class="small muted">${l.tipo==="despesa" && pn(l.qtd) > 1 ? `${fmt(pn(l.qtd))} × ${brl(pn(l.un))} · ` : ""}${esc(l.desc||"")}${l.por?` · lançado por ${esc(l.por)}`:""}</div><div class="row" style="gap:6px;margin-top:4px">${st}${l.auto?`<span class="chip s0">automático</span>`:""}${anexoHtml(l.anexo)}${S.readonly||l.auto?"":`<button class="btn sm ghost" data-editl="${esc(l.id)}">Editar</button>`}</div></div>
+    <div class="small muted">${l.tipo==="despesa" && pn(l.qtd) > 1 ? `${fmt(pn(l.qtd))} × ${brl(pn(l.un))} · ` : ""}${esc(l.desc||"")}${l.por && !l.auto?` · lançado por ${esc(l.por)}`:""}</div><div class="row" style="gap:6px;margin-top:4px">${st}${l.auto?`<span class="chip s0">automático</span>`:""}${anexoHtml(l.anexo)}${S.readonly||l.auto?"":`<button class="btn sm ghost" data-editl="${esc(l.id)}">Editar</button>`}</div></div>
     <div class="val ${isRec?"neg":""}">${isRec?"− ":""}${brl(pn(l.valor))}</div></div>`;
 }
 
 function viewOp(id){
   const op = opById(id); if (!op) return `<div class="empty">Pedido não encontrado. <button class="btn" data-back>Voltar</button></div>`;
-  const k = calc(op); const c = op.corte || {}; const f = finOp(op.id, S.F);
-  const st = (l,v,hl) => `<div class="stat ${hl?"hl":""}"><span>${l}</span><b>${v}</b></div>`;
-  const ed = !S.readonly;
-  const tn = tecidoNecessario(k.prod, k.qtd);
-  const ets = cobrancasAuto(op).map(e => ({...e, lanc: S.lanc.find(l => l.id === autoId(op.id, e.ref))}));
-  const lancs = S.lanc.filter(l => l.opId === op.id).sort((a,b)=>(b.data||"").localeCompare(a.data||""));
+  const k = calc(op); const c = op.corte || {}; const f = finOp(op.id, S.F); const fl = fluxo(op, k);
+  const ed = !S.readonly; const q = k.qtd;
+  const tn = tecidoNecessario(k.prod, q);
+  const bar = (a,b) => `<div class="bar"><b style="width:${b?Math.min(100,a/b*100):0}%"></b></div>`;
+  const cls = i => i < fl.cur || fl.cur < 0 ? "done" : i === fl.cur ? "now" : "";
+  const num = i => i < fl.cur || fl.cur < 0 ? "✓" : i+1;
   return `<div class="row"><button class="btn ghost" data-back>← Pedidos</button></div>
-  <div class="row between"><div><div class="row"><h1>${opCode(op)} · ${esc(k.prod?.nome||"Produto removido")}</h1><span class="chip s${k.st}">${k.stLabel}</span></div>
-    <div class="muted small">Início ${fdate(op.data)}${op.dataFinal?` · Final ${fdate(op.dataFinal)}`:""}${op.sku?` · SKU ${esc(op.sku)}`:""}${op.obs?` · ${esc(op.obs)}`:""}</div></div>
-    ${ed?`<div class="row"><button class="btn" id="editop">Editar pedido</button><button class="btn" id="fimop">${op.concluida?"Reabrir":"Concluir"}</button><button class="btn danger" id="delop">Excluir</button></div>`:""}</div>
-  ${stepsHtml(k)}
+  <div><h1>${opCode(op)} · ${esc(k.prod?.nome||"Produto removido")}</h1>
+    <div class="muted small">${fmt(q)} peças · início ${fdate(op.data)}${op.dataFinal?` · final ${fdate(op.dataFinal)}`:""}${op.obs?` · ${esc(op.obs)}`:""}</div></div>
+  <div class="card">${fl.html}${fl.next}</div>
 
-  <div class="card"><div class="row between"><h2>Conta deste pedido</h2></div>
-    <div class="stats">${st("Cobrado", brl(f.cob))}${st("Reembolsos", brl(f.desp))}${st("Pago pela Thaty", brl(f.pago))}${st("Em aberto", brl(f.aberto), f.aberto>0.005)}</div>
-    <div class="small muted">Cobranças automáticas: tecido ao lançar o pedido, corte e costura a cada entrega, assessoria quando o corte termina.</div>
-  </div>
-  ${secoesHtml(S.lanc.filter(l => l.opId === op.id), op.id)}
-
-  <div class="card"><h2>Tecido</h2><div class="stats">
-    ${st("Quantidade", fmt(k.qtd)+" pç")}
-    ${st("Necessário (cálculo)", tn.consumo ? `${fmt(tn.kg,1)} kg · ${tn.rolos||"—"} rolos` : "Defina o consumo no produto")}
-    ${st("Comprado", op.retalho ? "Retalho" : `${fmt(pn(op.kg),2)} kg × ${brl(pn(op.precoKg))}`, !op.retalho && !pn(op.kg))}
-    ${st("Valor do tecido", brl(k.custoTecido))}
-    ${st("Rolos · peças/rolo", op.retalho ? "—" : `${fmt(pn(op.rolos))} · ${k.pecasRolo?fmt(k.pecasRolo,1):"—"}`)}
-    ${st("Custo real por peça", brl(k.realUn), true)}
-    ${st("Custo estimado (ficha)", brl(k.estUn))}
-  </div></div>
-
-  <div class="card"><div class="row between"><h2>Corte · C${op.num}</h2>${ed?`<button class="btn sm" id="editcorte">Editar corte</button>`:""}</div>
-    <div class="stats">
-      ${st("Cortador", esc(c.local || "—"))}
-      ${st("Valor por peça", brl(k.corteUn))}
-      ${st("Entregue", `${fmt(k.cortado)} de ${fmt(k.qtd)}`)}
-      ${st("Falta entregar", fmt(k.aCortar)+" pç", k.aCortar>0)}
-      ${st("Pago ao cortador", brl(k.cortePago))}
-      ${st("A pagar ao cortador", brl(k.corteAPagar), k.corteAPagar>0)}
-    </div>
-    <div class="cols2">
-      <div><div class="row between"><h3>Entregas do corte</h3>${ed?`<button class="btn sm" data-add="ce|">+ Entrega</button>`:""}</div>${hist(c.entregas,"ce","")}</div>
-      <div><div class="row between"><h3>Pago ao cortador</h3>${ed?`<button class="btn sm" data-add="cp|">+ Pagamento</button>`:""}</div>${hist(c.pagamentos,"cp","",true)}</div>
+  <div class="card">
+    <div class="step ${cls(0)}"><i>${num(0)}</i><div><h2>Tecido</h2>
+      <div>${op.retalho ? "Feito com retalho (sem custo de tecido)" : pn(op.kg) ? `<b>${fmt(pn(op.kg),2)} kg</b> × ${brl(pn(op.precoKg))} = <b>${brl(k.custoTecido)}</b>` : `<span class="muted">Ainda não lançado.</span>`}</div>
+      ${tn.consumo ? `<div class="small muted">Cálculo: precisa de ${fmt(tn.kg,1)} kg${tn.rolos?` · ${tn.rolos} rolos`:""}${pn(op.rolos)?` · comprou ${fmt(pn(op.rolos))} rolos`:""}</div>` : ""}
+      ${ed && !pn(op.kg) && !op.retalho ? `<div><button class="btn sm pri" id="editop2">Lançar tecido</button></div>` : ""}
     </div></div>
 
-  <div class="card"><div class="row between"><div><h2>Costura e entrega</h2><div class="small muted">A entrega da oficina já conta como entregue à Thaty · enviado ${fmt(k.enviado)} · entregue ${fmt(k.costurado)} · <b>falta enviar ${fmt(k.aEnviar)}</b> peças cortadas</div></div>${ed?`<button class="btn pri sm" id="addparte">+ Enviar p/ oficina</button>`:""}</div>
-    ${k.partes.length ? k.partes.map(t => `<div class="parte">
-      <div class="row between"><div><b>${t.label} · ${esc(t.local||"Oficina")}</b><div class="small muted">Enviado ${fdate(t.data)} · ${fmt(t.q)} pç × ${brl(t.un)} = ${brl(t.total)}</div></div>
-        ${ed?`<div class="row"><button class="btn sm" data-add="te|${t.idx}">+ Entrega</button><button class="btn sm" data-add="tp|${t.idx}">+ Pago à oficina</button><button class="btn sm ghost" data-editparte="${t.idx}">Editar</button><button class="btn sm ghost danger" data-delparte="${t.idx}">Excluir</button></div>`:""}</div>
-      <div class="stats">${st("Entregue", `${fmt(t.entregue)} de ${fmt(t.q)}`)}${st("Falta entregar", fmt(t.aEntregar)+" pç", t.aEntregar>0)}${st("Pago à oficina", brl(t.pago))}${st("A pagar à oficina", brl(t.aPagar), t.aPagar>0)}</div>
-      <div class="cols2"><div><h3>Entregas</h3>${hist(t.entregas,"te",t.idx)}</div><div><h3>Pago à oficina</h3>${hist(t.pagamentos,"tp",t.idx,true)}</div></div>
-    </div>`).join("") : `<div class="empty">Nada enviado para costura ainda.</div>`}
+    <div class="step ${cls(1)}"><i>${num(1)}</i><div><div class="row between"><h2>Corte</h2>${ed?`<button class="btn sm ghost" id="editcorte">${esc(c.local||"Cortador")} · ${brl(k.corteUn)}/pç ✎</button>`:`<span class="small muted">${esc(c.local||"")}</span>`}</div>
+      <div class="row between small"><span><b>${fmt(k.cortado)}</b> de ${fmt(q)} cortadas</span>${k.aCortar?`<span class="muted">faltam ${fmt(k.aCortar)}</span>`:""}</div>${bar(k.cortado,q)}
+      ${ed && k.aCortar ? `<div><button class="btn sm pri" data-add="ce|">+ Chegou do corte</button></div>` : ""}
+      <details class="mini"><summary>Entregas do corte (${(c.entregas||[]).length})</summary>${hist(c.entregas,"ce","")}${ed && !k.aCortar ? `<button class="btn sm" data-add="ce|">+ Entrega</button>` : ""}</details>
+      ${ed ? `<details class="mini"><summary>Pagamento ao cortador · ${k.corteAPagar>0.005?`<b style="color:var(--bad)">a pagar ${brl(k.corteAPagar)}</b>`:`pago ${brl(k.cortePago)}`}</summary>${hist(c.pagamentos,"cp","",true)}<button class="btn sm" data-add="cp|">+ Paguei o cortador</button></details>` : ""}
+    </div></div>
+
+    <div class="step ${cls(2)}"><i>${num(2)}</i><div><div class="row between"><h2>Costura</h2>${ed && k.aEnviar ? `<button class="btn sm pri" id="addparte">+ Enviar ${fmt(k.aEnviar)} pç p/ oficina</button>` : ""}</div>
+      <div class="row between small"><span><b>${fmt(k.enviado)}</b> de ${fmt(q)} enviadas às oficinas</span></div>
+      ${k.partes.map(t => `<div class="oft">
+        <div class="row between"><b>${esc(t.local||"Oficina")}</b><span class="small muted">${fmt(t.q)} pç × ${brl(t.un)} · enviado ${fdate(t.data)}</span></div>
+        <div class="row between small"><span>Devolveu <b>${fmt(t.entregue)}</b> de ${fmt(t.q)}</span>${t.aEntregar?`<span class="muted">faltam ${fmt(t.aEntregar)}</span>`:`<span class="chip s3">completo</span>`}</div>${bar(t.entregue,t.q)}
+        ${ed && t.aEntregar ? `<div><button class="btn sm pri" data-add="te|${t.idx}">+ Chegou da oficina</button></div>` : ""}
+        <details class="mini"><summary>Entregas (${(t.entregas||[]).length})</summary>${hist(t.entregas,"te",t.idx)}${ed && !t.aEntregar ? `<button class="btn sm" data-add="te|${t.idx}">+ Entrega</button>` : ""}</details>
+        ${ed ? `<details class="mini"><summary>Pagamento à oficina · ${t.aPagar>0.005?`<b style="color:var(--bad)">a pagar ${brl(t.aPagar)}</b>`:`pago ${brl(t.pago)}`}</summary>${hist(t.pagamentos,"tp",t.idx,true)}<div class="row"><button class="btn sm" data-add="tp|${t.idx}">+ Paguei a oficina</button><button class="btn sm ghost" data-editparte="${t.idx}">Editar envio</button><button class="btn sm ghost danger" data-delparte="${t.idx}">Excluir envio</button></div></details>` : ""}
+      </div>`).join("")}
+      ${!k.partes.length ? `<div class="small muted">Nada enviado para oficina ainda.</div>` : ""}
+    </div></div>
+
+    <div class="step ${cls(3)}"><i>${num(3)}</i><div><h2>Entregue à Thaty</h2>
+      <div class="row between small"><span><b>${fmt(k.costurado)}</b> de ${fmt(q)} peças</span><span class="muted">a entrega da oficina já conta aqui</span></div>${bar(k.costurado,q)}
+      ${ed ? `<div><button class="btn sm" id="fimop">${op.concluida?"Reabrir pedido":"Concluir pedido"}</button></div>` : ""}
+    </div></div>
   </div>
 
+  <div class="card"><div class="row between"><h2>Conta deste pedido</h2>${ed?`<button class="btn sm" data-serv="${esc(op.id)}">+ Serviço</button>`:""}</div>
+    ${contaHtml(S.lanc.filter(l => l.opId === op.id), op.id)}
+    <div class="small muted">Cobrança automática: tecido ao lançar, corte e costura a cada entrega, assessoria quando o corte termina.</div>
+  </div>
+
+  <details class="mini"><summary>Mais opções do pedido</summary><div class="card" style="margin-top:8px">
+    <div class="stats"><div class="stat"><span>Custo real por peça</span><b>${brl(k.realUn)}</b></div><div class="stat"><span>Custo estimado (ficha)</span><b>${brl(k.estUn)}</b></div>${pn(op.rolos)?`<div class="stat"><span>Peças por rolo</span><b>${k.pecasRolo?fmt(k.pecasRolo,1):"—"}</b></div>`:""}</div>
+    ${ed?`<div class="row"><button class="btn" id="editop">Editar pedido</button><button class="btn danger" id="delop">Excluir pedido</button></div>`:""}
+  </div></details>
 `;
 }
-
 /* Financeiro por sessões: Tecido, Corte, Costura, Serviços e insumos, Assessoria */
 const SECOES = [["Tecido","Tecido"],["Corte","Corte"],["Costura","Costura"],["Servicos","Serviços e insumos"],["Assessoria","Assessoria"]];
 const secaoDe = l => l.tipo === "despesa" ? "Servicos" : (["Tecido","Corte","Costura","Assessoria"].includes(l.cat) ? l.cat : "Servicos");
-function secoesHtml(ls, opId){
+function contaHtml(ls, opId){
   const F = S.F; const ed = !S.readonly;
-  return SECOES.map(([k, nome]) => {
+  let T = 0, P = 0;
+  const rows = SECOES.map(([k, nome]) => {
     const it = ls.filter(l => l.tipo !== "recebimento" && secaoDe(l) === k).sort((a,b)=>(b.data||"").localeCompare(a.data||""));
     const pgs = ls.filter(l => l.tipo === "recebimento" && l.secao === k).sort((a,b)=>(b.data||"").localeCompare(a.data||""));
+    if (!it.length && !pgs.length) return "";
     const cob = sum(it, l => pn(l.valor)), pago = sum(it, l => F.map[l.id]?.pago || 0), ab = cob - pago;
-    const st = !it.length ? `<span class="chip s0">sem lançamentos</span>` : ab > 0.005 ? `<span class="chip s1">em aberto</span>` : `<span class="chip s3">pago</span>`;
-    const btnPagar = ed && ab > 0.005 ? `<button class="btn sm pri" data-pagar="${esc(opId||"")}|${k}|${r2(ab)}">Pagar ${brl(ab)}</button>` : "";
-    const btnServ = ed && k === "Servicos" ? `<button class="btn sm" data-serv="${esc(opId||"")}">+ Serviço</button>` : "";
-    return `<details class="card sec" ${ab > 0.005 ? "open" : ""}><summary><div class="row between"><h2>${nome}</h2><div class="row">${st}${btnServ}${btnPagar}</div></div>
-      <div class="stats"><div class="stat"><span>Valor</span><b>${brl(cob)}</b></div><div class="stat"><span>Pago</span><b>${brl(pago)}</b></div><div class="stat ${ab>0.005?"hl":""}"><span>Em aberto</span><b>${brl(ab)}</b></div></div></summary>
-      ${it.length ? `<div>${it.map(lancRow).join("")}</div>` : `<div class="small muted">Nada lançado nesta sessão.</div>`}
-      ${pgs.length ? `<h3>Pagamentos</h3><div>${pgs.map(lancRow).join("")}</div>` : ""}</details>`;
+    T += cob; P += pago;
+    return `<details><summary><b>${nome}</b><span class="v">${brl(cob)}</span><span class="v ${ab>0.005?"ab":"zero"}">${ab>0.005?brl(ab):"pago ✓"}</span></summary><div>
+      ${ed && ab > 0.005 ? `<div class="row" style="justify-content:flex-end;padding-top:8px"><button class="btn sm pri" data-pagar="${esc(opId||"")}|${k}|${r2(ab)}">Registrar pagamento de ${brl(ab)}</button></div>` : ""}
+      ${it.map(lancRow).join("")}${pgs.length ? `<h3 style="margin-top:8px">Pagamentos</h3>${pgs.map(lancRow).join("")}` : ""}</div></details>`;
   }).join("");
+  if (!rows) return `<div class="small muted">Nada lançado ainda.</div>`;
+  return `<div class="conta"><div class="h"><span>Sessão</span><span class="v">Valor</span><span class="v">Em aberto</span></div>${rows}
+    <div class="tot"><span>Total</span><span class="v">${brl(T)}</span><span class="v ${T-P>0.005?"ab":"zero"}">${brl(Math.max(0,T-P))}</span></div></div>`;
 }
 function viewFinanceiro(){
   const F = S.F; const ed = !S.readonly; const fo = S.fin.op;
   let ls = [...S.lanc];
   if (fo === "geral") ls = ls.filter(l => !l.opId); else if (fo !== "todas") ls = ls.filter(l => l.opId === fo);
   const recs = ls.filter(l => l.tipo === "recebimento").sort((a,b)=>(b.data||"").localeCompare(a.data||""));
-  const deb = ls.filter(l => l.tipo !== "recebimento");
-  const tot = sum(deb, l => pn(l.valor)), pago = sum(deb, l => F.map[l.id]?.pago || 0);
-  return `<div class="row between"><h1>Financeiro</h1>${ed?`<div class="row"><button class="btn" data-novo="despesa">+ Serviço</button></div>`:""}</div>
-  <div class="field"><label for="finop">Pedido</label><select id="finop"><option value="todas">Todos os pedidos</option><option value="geral" ${fo==="geral"?"selected":""}>Geral (sem pedido)</option>${sortedOps().map(o=>`<option value="${esc(o.id)}" ${fo===o.id?"selected":""}>${opCode(o)} · ${esc(produto(o.produtoId)?.nome||"")}</option>`).join("")}</select></div>
-  <div class="kpis">
-    <div class="kpi big"><span>Em aberto (Thaty)</span><b>${brl(Math.max(0, tot - pago))}</b><small>${fo==="todas" && F.credito>0.005 ? `crédito de ${brl(F.credito)}` : "a pagar"}</small></div>
-    <div class="kpi"><span>Total</span><b>${brl(tot)}</b></div>
-    <div class="kpi"><span>Pago</span><b>${brl(pago)}</b></div>
-  </div>
-  ${secoesHtml(ls, fo !== "todas" && fo !== "geral" ? fo : "")}
-  ${recs.filter(l => !l.secao).length ? `<details class="card sec"><summary><div class="row between"><h2>Pagamentos sem sessão</h2><b class="num">${brl(sum(recs.filter(l => !l.secao), l => pn(l.valor)))}</b></div></summary>${recs.filter(l => !l.secao).map(lancRow).join("")}</details>` : ""}`;
+  const opIdF = fo !== "todas" && fo !== "geral" ? fo : "";
+  return `${fo === "todas" ? heroThaty() : ""}
+  <div class="row between"><h1>Financeiro</h1>${ed?`<div class="row"><button class="btn" data-novo="recebimento">+ Pagamento</button><button class="btn" data-novo="despesa">+ Serviço</button></div>`:""}</div>
+  <div class="field"><label for="finop">Ver</label><select id="finop"><option value="todas">Todos os pedidos</option><option value="geral" ${fo==="geral"?"selected":""}>Geral (sem pedido)</option>${sortedOps().map(o=>`<option value="${esc(o.id)}" ${fo===o.id?"selected":""}>${opCode(o)} · ${esc(produto(o.produtoId)?.nome||"")}</option>`).join("")}</select></div>
+  <div class="card"><h2>O que a Thaty paga</h2><div class="small muted">Toque na sessão para ver os detalhes.</div>${contaHtml(ls, opIdF)}</div>
+  <div class="card"><h2>Pagamentos da Thaty</h2>${recs.length ? recs.map(lancRow).join("") : `<div class="small muted">Nenhum pagamento lançado.</div>`}</div>
+  ${ed && fo === "todas" ? oficinasResumo(S.ops.map(o => ({o, k:calc(o)}))) : ""}`;
 }
-
+function viewMais(){
+  const sb = S.mais || "orcamento";
+  return `<div class="subtabs" id="maistabs">${[["orcamento","Orçamento"],["cadastros","Cadastros"]].map(([v,t])=>`<button data-m="${v}" aria-pressed="${sb===v}">${t}</button>`).join("")}</div>
+  ${sb === "orcamento" ? viewOrcamento() : viewCadastros()}`;
+}
 function lancForm(tipo, l, opIdDefault, extra0 = {}){
   const novo = !l;
   const cats = tipo === "despesa" ? CAT_DESP : CAT_COB;
@@ -741,6 +780,8 @@ function opForm(op){
 
 function bind(){
   document.querySelectorAll("[data-op]").forEach(b => b.onclick = () => go("producoes", b.dataset.op));
+  document.querySelectorAll("[data-goto]").forEach(b => b.onclick = () => go(b.dataset.goto));
+  const mt = $("#maistabs"); if (mt) mt.onclick = e => { const b = e.target.closest("button"); if (b){ S.mais = b.dataset.m; render(); } };
   document.querySelectorAll("[data-back]").forEach(b => b.onclick = () => go("producoes"));
   document.querySelectorAll("#newop").forEach(n => n.onclick = () => opForm(null));
   const fl = $("#filtro"); if (fl) fl.onclick = e => { const b = e.target.closest("button"); if (b){ S.filtro = b.dataset.f; render(); } };
@@ -771,6 +812,7 @@ function bind(){
   const op = S.opId && opById(S.opId); if (!op || S.view !== "producoes") return;
   const upd = fn => { const o = clone(op); o.corte ||= {entregas:[],pagamentos:[]}; o.costuras ||= []; o.entregasCliente ||= []; fn(o); saveOp(o); };
   const e1 = $("#editop"); if (e1) e1.onclick = () => opForm(op);
+  const e2 = $("#editop2"); if (e2) e2.onclick = () => opForm(op);
   const fim = $("#fimop"); if (fim) fim.onclick = () => upd(o => { o.concluida = !o.concluida; o.dataFinal = o.concluida ? (o.dataFinal || today()) : ""; });
   const del = $("#delop"); if (del) del.onclick = () => {
     if (S.lanc.some(l => l.opId === op.id && !l.auto)){ toast("Este pedido tem pagamentos ou reembolsos lançados. Exclua-os antes."); return; }
