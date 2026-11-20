@@ -201,6 +201,11 @@ details.mini>summary::before{content:"▸ "} details.mini[open]>summary::before{
 .conta .tot{display:grid;grid-template-columns:1fr auto auto;gap:10px;padding:10px 4px;font-weight:700}
 .conta details>div{padding:4px 4px 10px;background:var(--bg);border-radius:0 0 8px 8px}
 .conta .pg{grid-column:1/-1;justify-self:end}
+.pix{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px dashed var(--tape);background:var(--tape-soft);border-radius:12px;padding:10px 14px}
+.pix span{font-size:12px;color:var(--muted);display:block}
+.pix b{font-size:16px;word-break:break-all}
+.pix small{display:block;font-size:12px;color:var(--muted)}
+.notif{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:14px}
 details.sec>summary{list-style:none;cursor:pointer;display:flex;flex-direction:column;gap:10px}
 details.sec>summary::-webkit-details-marker{display:none}
 details.sec>summary h2::after{content:" ▾";font-size:14px;color:var(--muted)}
@@ -487,9 +492,53 @@ function opCard(op){
     <div class="row between small"><span class="muted">Valor em aberto do pedido</span><b class="num" style="color:${f.aberto>0.005?"var(--bad)":"var(--ok)"}">${brl(Math.max(0,f.aberto))}</b></div>
   </button>`;
 }
+const PIX = {chave:"logari.hub@gmail.com", banco:"Banco BTG", nome:"Manuel Alves do Carmo"};
+function pixBox(){
+  return `<div class="pix"><div><span>Chave Pix para pagamento</span><b>${PIX.chave}</b><small>${PIX.banco} · ${PIX.nome}</small></div><button class="btn sm pri" data-copiar="${PIX.chave}">Copiar chave</button></div>`;
+}
+/* ===== notificações ===== */
+const VAPID_PUB = "BMnAa9S17bjnzezHmUFX5yY3gBL67Sa4VjgADuz4-LkuBmZF2SPMbwp4ZtWFRpNkmQGsI144HOsvG4a1CblSj3Q";
+const pushSuportado = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+const ehIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+const instalado = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+function notifBox(){
+  if (S.pushAtivo) return "";
+  if (!pushSuportado()){
+    return ehIOS() && !instalado() ? `<div class="notif"><span>🔔 Para receber avisos de pagamento no iPhone, instale o app na tela inicial (Compartilhar → Adicionar à Tela de Início) e abra por lá.</span></div>` : "";
+  }
+  if (Notification.permission === "denied") return `<div class="notif"><span>🔕 Notificações bloqueadas. Libere nas configurações do navegador para este site.</span></div>`;
+  return `<div class="notif"><span>🔔 Receba um aviso no celular a cada pedido de pagamento.</span><button class="btn sm pri" id="ativarnotif">Ativar notificações</button></div>`;
+}
+function b64uBytes(s){ s = s.replace(/-/g,"+").replace(/_/g,"/"); while (s.length % 4) s += "="; return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
+async function gravarAuth(){
+  try { const c = await caches.open("pt-auth"); await c.put("/__api", new Response(API)); await c.put("/__pin", new Response(S.pin)); } catch(e){}
+}
+async function checarPush(){
+  if (!pushSuportado() || !S.ok) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    const ativo = !!sub && Notification.permission === "granted";
+    if (ativo){ await gravarAuth(); api("subscribe", {sub: sub.toJSON()}).catch(() => {}); }
+    if (ativo !== !!S.pushAtivo){ S.pushAtivo = ativo; render(); }
+  } catch(e){}
+}
+async function ativarNotif(){
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted"){ toast("Notificações não autorizadas."); render(); return; }
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64uBytes(VAPID_PUB)});
+    await gravarAuth();
+    try { const c = await caches.open("pt-auth"); const r = await c.match("/__since"); if (!r) await c.put("/__since", new Response(String(Date.now()))); } catch(e){}
+    await api("subscribe", {sub: sub.toJSON()});
+    S.pushAtivo = true; toast("Notificações ativadas neste aparelho."); render();
+  } catch(e){ toast("Não foi possível ativar: " + e.message); }
+}
 function heroThaty(){
   const F = S.F; const ab = Math.max(0, F.aberto);
-  return `<div class="hero"><div><span>Valor em aberto</span><b>${brl(ab)}</b><small>${F.despAberto>0.005?`inclui ${brl(F.despAberto)} de serviços a reembolsar`:"tudo em dia nos reembolsos"}${F.credito>0.005?` · sobra a favor dela ${brl(F.credito)}`:""}</small></div>${S.view!=="financeiro"?`<button class="btn" data-goto="financeiro">Ver financeiro →</button>`:""}</div>`;
+  return `<div class="hero"><div><span>Valor em aberto</span><b>${brl(ab)}</b><small>${F.despAberto>0.005?`inclui ${brl(F.despAberto)} de serviços a reembolsar`:"tudo em dia nos reembolsos"}${F.credito>0.005?` · sobra a favor dela ${brl(F.credito)}`:""}</small></div>${S.view!=="financeiro"?`<button class="btn" data-goto="financeiro">Ver financeiro →</button>`:""}</div>${pixBox()}${notifBox()}`;
 }
 function viewProducoes(){
   const all = sortedOps().map(o => ({o, k:calc(o)}));
@@ -781,6 +830,8 @@ function opForm(op){
 function bind(){
   document.querySelectorAll("[data-op]").forEach(b => b.onclick = () => go("producoes", b.dataset.op));
   document.querySelectorAll("[data-goto]").forEach(b => b.onclick = () => go(b.dataset.goto));
+  document.querySelectorAll("[data-copiar]").forEach(b => b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.copiar); toast("Chave Pix copiada."); } catch(e){ prompt("Copie a chave Pix:", b.dataset.copiar); } });
+  const an = $("#ativarnotif"); if (an) an.onclick = ativarNotif;
   const mt = $("#maistabs"); if (mt) mt.onclick = e => { const b = e.target.closest("button"); if (b){ S.mais = b.dataset.m; render(); } };
   document.querySelectorAll("[data-back]").forEach(b => b.onclick = () => go("producoes"));
   document.querySelectorAll("#newop").forEach(n => n.onclick = () => opForm(null));
@@ -933,10 +984,10 @@ function bindLogin(){
   };
   $("#entrar").onclick = go_; $("#pin").onkeydown = e => { if (e.key === "Enter") go_(); }; $("#pin").focus();
 }
-function sair(){ store.set("pt_pin", null); store.set("pt_user", null); store.set("pt_cache", null); S.ok = false; S.pin = ""; S.user = ""; COLS.forEach(c => S.loaded[c] = false); $("#who").hidden = true; render(); }
+function sair(){ caches.delete("pt-auth").catch(()=>{}); S.pushAtivo = false; store.set("pt_pin", null); store.set("pt_user", null); store.set("pt_cache", null); S.ok = false; S.pin = ""; S.user = ""; COLS.forEach(c => S.loaded[c] = false); $("#who").hidden = true; render(); }
 function entrou(){
   const w = $("#who"); w.hidden = false; w.textContent = S.user + " · sair"; w.onclick = () => sair();
-  render(); carregar();
+  render(); carregar(); checarPush();
   clearInterval(S.poll); S.poll = setInterval(checar, 25000);
 }
 async function carregar(){
