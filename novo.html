@@ -724,7 +724,8 @@ function viewInicio(){
 function viewProducoes(){
   const all = sortedOps().map(o => ({o, k:calc(o)}));
   const ab = all.filter(x => x.k.aberta), fe = all.filter(x => !x.k.aberta);
-  return `<div class="row between"><h1>Pedidos</h1>${S.readonly?"":`<button class="btn pri" id="newop">+ Novo pedido</button>`}</div>
+  return `<div class="row between"><h1>Pedidos</h1>${S.readonly || !ehManuel() ? "" : `<button class="btn" id="newop">+ Nova produção</button>`}</div>
+  ${pedidosHtml()}
   ${ab.length ? `<div class="oplist">${ab.map(x=>opCard(x.o)).join("")}</div>` : `<div class="empty">Nenhum pedido em andamento.</div>`}
   ${fe.length ? `<details class="mini"><summary>Pedidos entregues (${fe.length})</summary><div class="oplist" style="margin-top:10px">${fe.map(x=>opCard(x.o)).join("")}</div></details>` : ""}`;
 }
@@ -896,9 +897,7 @@ function viewFinanceiro(){
   ${ed && fo === "todas" ? oficinasResumo(S.ops.map(o => ({o, k:calc(o)}))) : ""}`;
 }
 function viewMais(){
-  const sb = S.mais || "orcamento";
-  return `<div class="subtabs" id="maistabs">${[["orcamento","Orçamento"],["cadastros","Cadastros"]].map(([v,t])=>`<button data-m="${v}" aria-pressed="${sb===v}">${t}</button>`).join("")}</div>
-  ${sb === "orcamento" ? viewOrcamento() : viewCadastros()}`;
+  return viewCadastros();
 }
 function lancForm(tipo, l, opIdDefault, extra0 = {}){
   const novo = !l;
