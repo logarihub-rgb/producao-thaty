@@ -265,6 +265,8 @@ h1{font-family:var(--font-display);font-weight:800;font-size:26px} h2{font-famil
 .corrow{display:grid;grid-template-columns:1fr 110px 34px;gap:8px;align-items:end}
 .est{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
 .hint{font-size:12px;color:var(--accent)}
+.fab{position:static!important;box-shadow:none!important;padding:6px 12px!important;font-size:13px!important;border-radius:999px;margin-left:auto;margin-right:8px;flex:none}
+@media (max-width:760px){.fab{bottom:auto!important;padding:8px!important;margin-right:6px}.fab span{display:none}.sync{display:none}.brand{font-size:16px!important;letter-spacing:1.5px}.who{font-size:12px;white-space:nowrap}}
 </style>
 </head>
 <body>
@@ -276,10 +278,11 @@ h1{font-family:var(--font-display);font-weight:800;font-size:26px} h2{font-famil
     <button data-v="financeiro">Extrato</button>
     <button data-v="mais">Mais</button>
   </nav>
+  <button class="fab" id="fab" title="Lançar serviço" hidden aria-label="Lançar outro serviço ou reembolso"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M6 2h12a1 1 0 0 1 1 1v18l-3-2-2 2-2-2-2 2-2-2-3 2V3a1 1 0 0 1 1-1zm2 5v2h8V7H8zm0 4v2h8v-2H8zm0 4v2h5v-2H8z"/></svg><span>Serviço</span></button>
   <span class="sync" id="sync">Conectando…</span><button class="who" id="who" hidden></button>
 </div></header>
 <main id="main"><div class="empty">Carregando dados da produção…</div></main>
-<button class="fab" id="fab" hidden aria-label="Lançar outro serviço ou reembolso"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M6 2h12a1 1 0 0 1 1 1v18l-3-2-2 2-2-2-2 2-2-2-3 2V3a1 1 0 0 1 1-1zm2 5v2h8V7H8zm0 4v2h8v-2H8zm0 4v2h5v-2H8z"/></svg><span>Serviço</span></button>
+
 <div id="modal-root"></div>
 
 <script src="config.js"></script>
