@@ -259,6 +259,11 @@ h1{font-family:var(--font-display);font-weight:800;font-size:26px} h2{font-famil
 .ext .sl{grid-column:3;text-align:right;font-size:11px;color:var(--muted)}
 .ext .ds{grid-column:2;font-size:12px;color:var(--muted)}
 .welcome{font-size:13px;color:var(--muted)} .welcome b{color:var(--pink)}
+.kpi.big{background:var(--accent)!important;border-color:var(--accent)!important}
+.kpi.big b,.kpi.big span,.kpi.big small{color:var(--accent-ink)!important;opacity:1!important}
+.corrow{display:grid;grid-template-columns:1fr 110px 34px;gap:8px;align-items:end}
+.est{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.hint{font-size:12px;color:var(--accent)}
 </style>
 </head>
 <body>
@@ -280,9 +285,9 @@ h1{font-family:var(--font-display);font-weight:800;font-size:26px} h2{font-famil
 <script>
 const DEF_CFG = {extra:2.9, assessoria:1.2, corteUn:0.4, corteLocal:"THÁSSIO", costuraUn:2.8, perda:0, modelagem:95};
 const VIEWS = ["inicio","producoes","financeiro","mais"];
-const COLS = ["insumos","produtos","ops","lanc"];
+const COLS = ["insumos","produtos","ops","lanc","pedidos"];
 const API = window.PT_API || "";
-const S = {pin:"", user:"", ok:false, insumos:[], produtos:[], ops:[], lanc:[], cfg:{...DEF_CFG}, loaded:{}, view:"inicio", opId:null, sub:"insumos", orc:{prod:"",qtd:""}, fin:{op:"todas"}, readonly:false};
+const S = {pin:"", user:"", ok:false, insumos:[], produtos:[], ops:[], lanc:[], pedidos:[], cfg:{...DEF_CFG}, loaded:{}, view:"inicio", opId:null, sub:"insumos", orc:{prod:"",qtd:""}, fin:{op:"todas"}, readonly:false};
 const CAT_COB = ["Tecido","Corte","Costura","Assessoria","Outro"];
 const CAT_DESP = ["Modelagem","Pilotagem","Impressão de risco","Frete motoboy","Carreto","Outro"];
 
@@ -312,7 +317,7 @@ async function api(action, body={}){
 let pendentes = 0;
 /* cache local: o app abre na hora com os últimos dados e atualiza em segundo plano */
 let cacheT;
-function salvarCache(){ clearTimeout(cacheT); cacheT = setTimeout(() => { try { store.set("ptn_cache", JSON.stringify({insumos:S.insumos, produtos:S.produtos, ops:S.ops, lanc:S.lanc, cfg:S.cfg, rev:S.rev})); } catch(e){} }, 400); }
+function salvarCache(){ clearTimeout(cacheT); cacheT = setTimeout(() => { try { store.set("ptn_cache", JSON.stringify({pedidos:S.pedidos, insumos:S.insumos, produtos:S.produtos, ops:S.ops, lanc:S.lanc, cfg:S.cfg, rev:S.rev})); } catch(e){} }, 400); }
 function lerCache(){ try { const c = JSON.parse(store.get("ptn_cache") || "null"); if (!c) return false; COLS.forEach(k => { S[k] = c[k] || []; S.loaded[k] = true; }); S.cfg = {...DEF_CFG, ...(c.cfg||{})}; S.rev = c.rev; return true; } catch(e){ return false; } }
 function setSync(t){ const el = $("#sync"); if (el) el.textContent = t; }
 const queues = {};
@@ -588,13 +593,24 @@ function heroThaty(){
   const F = S.F; const ab = Math.max(0, F.aberto);
   return `<div class="hero"><div><span class="lbl">Valor em aberto</span><b>${brl(ab)}</b><small class="muted">soma de tudo já feito e ainda não pago</small></div>${S.view!=="inicio"?`<button class="btn sm" data-goto="inicio">Entenda →</button>`:""}</div>`;
 }
+function statsProd(prodId){
+  const os = S.ops.filter(o => o.produtoId === prodId);
+  const valor = sum(os, o => o.retalho ? 0 : pn(o.kg)*pn(o.precoKg)), kg = sum(os, o => o.retalho ? 0 : pn(o.kg));
+  const qtd = sum(os, o => pn(o.qtd)), rolos = sum(os, o => o.retalho ? 0 : pn(o.rolos));
+  const comPreco = os.filter(o => pn(o.precoKg) > 0).sort((a,b) => (b.num||0)-(a.num||0))[0];
+  const cst = os.flatMap(o => o.costuras || []).filter(t => pn(t.custoUn) > 0).slice(-1)[0];
+  return {n: os.length, valor, kg, qtd, rolos, rate: qtd ? valor/qtd : 0, ppr: rolos && qtd ? qtd/rolos : 0, kgRolo: rolos ? kg/rolos : pn(produto(prodId)?.kgRolo),
+    precoKg: comPreco ? pn(comPreco.precoKg) : pn(produto(prodId)?.precoKg), costuraUn: cst ? pn(cst.custoUn) : pn(S.cfg.costuraUn)};
+}
 function custoPeca(op, k){
   const q = k.qtd || 0;
   const serv = sum(S.lanc.filter(l => l.opId === op.id && l.tipo === "despesa"), l => pn(l.valor));
   const qs = sum(k.partes, t => t.q);
   const cost = qs ? sum(k.partes, t => t.q*t.un)/qs : pn(S.cfg.costuraUn);
   const it = [
-    {n:"Tecido", v: q ? k.custoTecido/q : 0, d: op.retalho ? "feito com retalho, sem custo" : pn(op.kg) ? `${fmt(pn(op.kg),2)} kg × ${brl(pn(op.precoKg))} = ${brl(k.custoTecido)} ÷ ${fmt(q)} peças` : "ainda não comprado", p: !op.retalho && !pn(op.kg)},
+    (() => { const st = statsProd(op.produtoId); return st.valor > 0
+      ? {n:"Tecido", v: st.rate, d:`${brl(st.valor)} de tecido (${fmt(st.rolos)} rolos) ÷ ${fmt(st.qtd)} peças de ${st.n} produç${st.n>1?"ões":"ão"}`, p:false}
+      : {n:"Tecido", v:0, d:"ainda não comprado", p:true}; })(),
     {n:"Corte", v: k.corteUn || pn(S.cfg.corteUn), d:"valor fixo por peça cortada", p: !k.corteUn},
     {n:"Costura (oficina)", v: cost, d:"valor por peça costurada", p: !qs},
     {n:"Assessoria", v: pn(S.cfg.assessoria), d:"acompanhamento e conferência, só na entrega", p:false},
@@ -614,11 +630,70 @@ function cardPeca(op){
     <div class="eq"><div><span>Já feito</span><b>${brl(feito)}</b></div><i>−</i><div><span>Pago</span><b>${brl(f.pago)}</b></div><i>=</i><div><span>Em aberto</span><b class="gold">${brl(Math.max(0,f.aberto))}</b></div></div>
   </div>`;
 }
+const ehManuel = () => !/thaty/i.test(S.user || "");
+function estPedido(prodId, cores){
+  const st = statsProd(prodId); const tot = sum(cores, c => pn(c.qtd));
+  const linhas = cores.filter(c => pn(c.qtd) > 0).map(c => ({...c, q:pn(c.qtd), rolos: st.ppr ? Math.ceil(pn(c.qtd)/st.ppr) : 0}));
+  const rolos = sum(linhas, l => l.rolos); const kg = rolos * st.kgRolo;
+  const tecido = st.ppr ? kg * st.precoKg : 0;
+  const corte = tot * pn(S.cfg.corteUn), costura = tot * st.costuraUn, ass = tot * pn(S.cfg.assessoria);
+  return {st, tot, linhas, rolos, kg, tecido, corte, costura, ass, total: tecido + corte + costura + ass, temBase: !!st.ppr};
+}
+function estHtml(e){
+  if (!e.tot) return `<div class="small muted">Preencha as quantidades para ver a estimativa.</div>`;
+  if (!e.temBase) return `<div class="est"><b>${fmt(e.tot)} peças</b><span class="small muted">Ainda não temos produção deste modelo para medir quantas peças saem por rolo. O Manuel calcula o tecido e te passa.</span><span>Costura prevista: <b>${brl(e.costura)}</b> (${fmt(e.tot)} × ${brl(e.st.costuraUn)})</span></div>`;
+  return `<div class="est">
+    <span class="hint">Rende cerca de ${fmt(e.st.ppr,0)} peças por rolo (medido nas produções anteriores). Cada cor varia um pouco.</span>
+    ${e.linhas.map(l => `<div class="row between small"><span>${esc(l.cor||"Cor")} · ${fmt(l.q)} pç</span><b>${l.rolos} rolo${l.rolos>1?"s":""}</b></div>`).join("")}
+    <div class="ln"><span>Tecido aprox.</span><span class="v">${brl(e.tecido)}</span><small>${e.rolos} rolos ≈ ${fmt(e.kg,0)} kg × ${brl(e.st.precoKg)}</small></div>
+    <div class="ln"><span>Corte</span><span class="v">${brl(e.corte)}</span><small>${fmt(e.tot)} × ${brl(pn(S.cfg.corteUn))}</small></div>
+    <div class="ln"><span>Costura</span><span class="v">${brl(e.costura)}</span><small>${fmt(e.tot)} × ${brl(e.st.costuraUn)}</small></div>
+    <div class="ln"><span>Assessoria</span><span class="v">${brl(e.ass)}</span><small>${fmt(e.tot)} × ${brl(pn(S.cfg.assessoria))}</small></div>
+    <div class="ln tot"><span>Total aproximado</span><span class="v">${brl(e.total)}</span><small>≈ ${brl(e.total/e.tot)} por peça · sem fretes e modelagem</small></div>
+  </div>`;
+}
+function pedidosHtml(){
+  const ps = [...(S.pedidos||[])].filter(p => p.status !== "produzindo").sort((a,b) => (b.criadoEm||"").localeCompare(a.criadoEm||""));
+  return `<div class="card"><div class="row between"><div><div class="lbl">Novo pedido</div><div class="small muted">Monte o próximo pedido por cor e veja na hora o tecido e o custo aproximados.</div></div><button class="btn pri" id="novoped">+ Fazer pedido</button></div>
+    ${ps.map(p => { const e = estPedido(p.produtoId, p.cores||[]); return `<details class="oft"><summary class="row between" style="cursor:pointer"><span><b>${esc(produto(p.produtoId)?.nome||"Modelo")}</b> · ${fmt(e.tot)} pç <span class="small muted">· ${fdate(p.data)}</span></span><span class="chip ${p.status==="aceito"?"s3":"s1"}">${p.status==="aceito"?"Aceito":"Solicitado"}</span></summary>
+      <div class="small muted">${(p.cores||[]).map(c => `${esc(c.cor)} ${fmt(pn(c.qtd))}`).join(" · ")}${p.obs?` · ${esc(p.obs)}`:""}</div>${estHtml(e)}
+      <div class="row">${ehManuel() && p.status!=="aceito" ? `<button class="btn sm pri" data-pedst="${esc(p.id)}|aceito">Aceitar</button>` : ""}${ehManuel() ? `<button class="btn sm" data-pedst="${esc(p.id)}|produzindo">Já virou produção</button>` : ""}${p.status!=="aceito" || ehManuel() ? `<button class="btn sm ghost danger" data-peddel="${esc(p.id)}">Excluir</button>` : ""}</div></details>`; }).join("")}
+  </div>`;
+}
+function pedidoForm(){
+  if (!S.produtos.length){ toast("Nenhum modelo cadastrado."); return; }
+  const st = {prod: S.produtos[0].id, cores:[{cor:"",qtd:""},{cor:"",qtd:""}], obs:""};
+  const draw = () => {
+    const e = estPedido(st.prod, st.cores);
+    $("#pedrows").innerHTML = st.cores.map((c,i) => `<div class="corrow"><div class="field"><label>Cor</label><input data-ci="${i}" data-k="cor" value="${esc(c.cor)}" placeholder="Ex.: Preto"></div><div class="field"><label>Peças</label><input data-ci="${i}" data-k="qtd" inputmode="numeric" value="${esc(c.qtd)}" placeholder="500"></div><button class="btn sm ghost" data-crm="${i}" aria-label="Remover cor">✕</button></div>`).join("");
+    $("#pedest").innerHTML = estHtml(e);
+    document.querySelectorAll("#pedrows input").forEach(inp => inp.oninput = () => { st.cores[+inp.dataset.ci][inp.dataset.k] = inp.value; $("#pedest").innerHTML = estHtml(estPedido(st.prod, st.cores)); });
+    document.querySelectorAll("[data-crm]").forEach(b => b.onclick = () => { st.cores.splice(+b.dataset.crm,1); if (!st.cores.length) st.cores.push({cor:"",qtd:""}); draw(); });
+  };
+  modal(`<h2>Fazer pedido</h2>
+    <div class="field"><label for="pedprod">Modelo</label><select id="pedprod">${S.produtos.map(p => `<option value="${esc(p.id)}">${esc(p.nome)}</option>`).join("")}</select></div>
+    <div id="pedrows" style="display:flex;flex-direction:column;gap:8px"></div>
+    <button class="btn sm" id="pedadd">+ Outra cor</button>
+    <div id="pedest"></div>
+    <div class="field"><label for="pedobs">Observação (opcional)</label><input id="pedobs" placeholder="Prazo, detalhe de tamanho…"></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="pedcanc">Cancelar</button><button class="btn pri" id="pedok">Enviar pedido</button></div>`, () => {
+    draw();
+    $("#pedprod").onchange = e => { st.prod = e.target.value; draw(); };
+    $("#pedadd").onclick = () => { st.cores.push({cor:"",qtd:""}); draw(); };
+    $("#pedcanc").onclick = closeModal;
+    $("#pedok").onclick = () => {
+      const cores = st.cores.filter(c => pn(c.qtd) > 0).map(c => ({cor:(c.cor||"").trim() || "Sem cor", qtd:pn(c.qtd)}));
+      if (!cores.length){ toast("Coloque a quantidade de pelo menos uma cor."); return; }
+      write("pedidos/" + uid(), {produtoId:st.prod, cores, obs:$("#pedobs").value.trim(), data:today(), status:"solicitado", por:S.user, criadoEm:new Date().toISOString()});
+      closeModal(); toast("Pedido enviado ao Manuel ✨");
+    };
+  });
+}
 function viewInicio(){
   const F = S.F; const ab = Math.max(0, F.aberto); const feito = F.totCob + F.totDesp;
   const confere = Math.abs(feito - F.totRec + F.credito - F.aberto) < 0.02;
   const sec = SECOES.map(([key,nome]) => { const it = S.lanc.filter(l => l.tipo !== "recebimento" && secaoDe(l) === key); const v = sum(it, l => pn(l.valor)), p = sum(it, l => F.map[l.id]?.pago || 0); return {nome, v, ab: v - p}; }).filter(x => x.ab > 0.005);
-  const ops = sortedOps().filter(o => calc(o).aberta);
+  const ops = sortedOps().filter(o => calc(o).aberta || finOp(o.id, S.F).aberto > 0.005);
   const ultimo = ops.length ? ops : sortedOps().slice(0,1);
   return `<div class="welcome">Olá, <b>Thaty ✨</b> · aqui está tudo da sua produção, conta por conta.</div>
   <div class="card">
@@ -630,6 +705,7 @@ function viewInicio(){
     ${confere ? `<div class="okline">✓ Conta conferida: todos os valores batem.</div>` : ""}
   </div>
   ${sec.length ? `<div class="card"><div class="lbl">De onde vem o valor em aberto</div><div>${sec.map(x => `<div class="ln"><span>${x.nome}</span><span class="v">${brl(x.ab)}</span><small>${x.ab < x.v - 0.005 ? `de ${brl(x.v)} feito, parte já paga` : `já feito, aguardando pagamento`}</small></div>`).join("")}</div><button class="btn sm" data-goto="financeiro">Ver extrato completo →</button></div>` : ""}
+  ${pedidosHtml()}
   ${pixBox()}${notifBox()}
   ${ultimo.map(o => cardPeca(o)).join("")}
   <details class="card"><summary class="lbl" style="cursor:pointer">Como funciona a cobrança ▾</summary><div class="how">
@@ -940,6 +1016,9 @@ function bind(){
   document.querySelectorAll("[data-op]").forEach(b => b.onclick = () => go("producoes", b.dataset.op));
   document.querySelectorAll("[data-goto]").forEach(b => b.onclick = () => go(b.dataset.goto));
   const ea = $("#extall"); if (ea) ea.onclick = () => { S.extTodos = true; render(); };
+  const npd = $("#novoped"); if (npd) npd.onclick = pedidoForm;
+  document.querySelectorAll("[data-pedst]").forEach(b => b.onclick = () => { const [id, s] = b.dataset.pedst.split("|"); const p = S.pedidos.find(x => x.id === id); if (!p) return; const {id:_, ...d} = p; write("pedidos/" + id, {...d, status:s}); });
+  document.querySelectorAll("[data-peddel]").forEach(b => b.onclick = () => confirmBox("Excluir este pedido?", () => write("pedidos/" + b.dataset.peddel, null)));
   document.querySelectorAll("[data-copiar]").forEach(b => b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.copiar); toast("Chave Pix copiada."); } catch(e){ prompt("Copie a chave Pix:", b.dataset.copiar); } });
   const an = $("#ativarnotif"); if (an) an.onclick = ativarNotif;
   const mt = $("#maistabs"); if (mt) mt.onclick = e => { const b = e.target.closest("button"); if (b){ S.mais = b.dataset.m; render(); } };
