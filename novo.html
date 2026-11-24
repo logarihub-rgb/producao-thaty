@@ -267,6 +267,14 @@ h1{font-family:var(--font-display);font-weight:800;font-size:26px} h2{font-famil
 .hint{font-size:12px;color:var(--accent)}
 .fab{position:static!important;box-shadow:none!important;padding:6px 12px!important;font-size:13px!important;border-radius:999px;margin-left:auto;margin-right:8px;flex:none}
 @media (max-width:760px){.fab{bottom:auto!important;padding:8px!important;margin-right:6px}.fab span{display:none}.sync{display:none}.brand{font-size:16px!important;letter-spacing:1.5px}.who{font-size:12px;white-space:nowrap}}
+.paybox{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;background:var(--tape-soft);border:1px solid var(--accent);border-radius:10px;padding:12px}
+.paybox span{display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.paybox b{display:block;font-size:15px;word-break:break-all}.paybox small{color:var(--muted);font-size:12px}
+.hero2{display:flex;flex-direction:column;gap:10px}
+details.card>summary{list-style:none}details.card>summary::-webkit-details-marker{display:none}
+.sumrow{display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer}
+details.card[open] .sumrow .gold:last-child{opacity:.6}
+.welcome{font-size:15px}
 </style>
 </head>
 <body>
@@ -534,6 +542,14 @@ function fluxo(op, k){
   const html = `<div class="flow">${nomes.map((n,i)=>`<div class="fs ${done[i]?"done":i===cur?"now":""}"><i>${done[i]?"✓":i+1}</i><b>${n}</b><small>${subs[i]}</small></div>`).join("")}</div>`;
   let nx, ok = false;
   const ofs = k.partes.filter(t => t.aEntregar > 0).map(t => (t.local||"oficina").toUpperCase());
+  if (!adm()){
+    if (!done[0]) nx = `Aguardando: <b>compra do tecido</b>`;
+    else if (k.aCortar > 0) nx = k.cortado ? `Cortando: <b>faltam ${fmt(k.aCortar)} peças</b>` : `Próxima etapa: <b>corte</b>`;
+    else if (k.aEnviar > 0) nx = `Indo para a costura: <b>${fmt(k.aEnviar)} peças</b>`;
+    else if (k.naCostura > 0) nx = `Na costura: <b>${fmt(k.naCostura)} peças</b>`;
+    else { nx = `<b>Pronto ✓</b> · todas as peças entregues`; ok = true; }
+    return {html, next:`<div class="next ${ok?"ok":""}">${nx}</div>`, cur};
+  }
   if (!done[0]) nx = `Próximo: <b>lançar o tecido comprado</b>`;
   else if (k.aCortar > 0) nx = k.cortado ? `No corte: <b>faltam ${fmt(k.aCortar)} pç</b> (${esc(op.corte?.local||"cortador")})` : `Próximo: <b>mandar para o corte</b> (${esc(op.corte?.local||"cortador")})`;
   else if (k.aEnviar > 0) nx = `Próximo: <b>enviar ${fmt(k.aEnviar)} pç para oficina</b>`;
@@ -547,7 +563,7 @@ function opCard(op){
   return `<button class="op" data-op="${esc(op.id)}">
     <div class="row between"><div class="row" style="gap:8px"><span class="code">${opCode(op)}</span><div><b>${esc(k.prod?.nome || "Produto removido")}</b><div class="small muted">${fmt(k.qtd)} peças · ${fdate(op.data)}</div></div></div></div>
     ${fl.html}${fl.next}
-    <div class="row between small"><span class="muted">Valor em aberto do pedido</span><b class="num" style="color:${f.aberto>0.005?"var(--bad)":"var(--ok)"}">${brl(Math.max(0,f.aberto))}</b></div>
+    <div class="row between small"><span class="muted">${f.aberto>0.005?"Falta pagar deste pedido":"Pedido pago"}</span><b class="num" style="color:${f.aberto>0.005?"var(--warn)":"var(--ok)"}">${f.aberto>0.005?brl(f.aberto):"✓"}</b></div>
   </button>`;
 }
 const PIX = {chave:"logari.hub@gmail.com", banco:"Banco BTG", nome:"Manuel Alves do Carmo"};
@@ -564,7 +580,7 @@ function notifBox(){
   if (!pushSuportado()){
     return ehIOS() && !instalado() ? `<div class="notif"><span>🔔 Para receber avisos de pagamento no iPhone, instale o app na tela inicial (Compartilhar → Adicionar à Tela de Início) e abra por lá.</span></div>` : "";
   }
-  if (Notification.permission === "denied") return `<div class="notif"><span>🔕 Notificações bloqueadas. Libere nas configurações do navegador para este site.</span></div>`;
+  if (Notification.permission === "denied") return "";
   return `<div class="notif"><span>🔔 Receba um aviso no celular a cada pedido de pagamento.</span><button class="btn sm pri" id="ativarnotif">Ativar notificações</button></div>`;
 }
 function b64uBytes(s){ s = s.replace(/-/g,"+").replace(/_/g,"/"); while (s.length % 4) s += "="; return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
@@ -624,18 +640,14 @@ function custoPeca(op, k){
   return {it, total: sum(it, x => x.v), q};
 }
 function cardPeca(op){
-  const k = calc(op); const f = finOp(op.id, S.F); const c = custoPeca(op, k); const fl = fluxo(op, k);
-  const feito = f.cob + f.desp; const prevTot = c.total * c.q;
-  return `<div class="card">
-    <div class="row between"><div><div class="lbl">${opCode(op)} · ${fmt(c.q)} peças</div><h2>${esc(k.prod?.nome || "Pedido")}</h2></div><button class="btn sm" data-op="${esc(op.id)}">Detalhes →</button></div>
-    ${fl.html}${fl.next}
-    <div><div class="lbl">Quanto custa cada peça</div><div class="big gold">${brl(c.total)}</div></div>
+  const k = calc(op); const c = custoPeca(op, k);
+  return `<details class="card"><summary class="sumrow"><div><div class="lbl">Quanto custa cada peça · ${esc(k.prod?.nome || "modelo")}</div><div class="big gold">${brl(c.total)}</div></div><span class="small gold">ver conta ▾</span></summary>
     <div>${c.it.map(x => `<div class="ln"><span>${x.n}${x.p?`<span class="prev">previsto</span>`:""}</span><span class="v">${brl(x.v)}</span><small>${x.d}</small></div>`).join("")}
-      <div class="ln tot"><span>Total por peça</span><span class="v">${brl(c.total)}</span><small>× ${fmt(c.q)} peças = ${brl(prevTot)} no pedido inteiro</small></div></div>
-    <div class="eq"><div><span>Já feito</span><b>${brl(feito)}</b></div><i>−</i><div><span>Pago</span><b>${brl(f.pago)}</b></div><i>=</i><div><span>Em aberto</span><b class="gold">${brl(Math.max(0,f.aberto))}</b></div></div>
-  </div>`;
+      <div class="ln tot"><span>Total por peça</span><span class="v">${brl(c.total)}</span><small>soma das etapas acima</small></div></div>
+  </details>`;
 }
 const ehManuel = () => !/thaty/i.test(S.user || "");
+const adm = () => !S.readonly && ehManuel();
 function estPedido(prodId, cores){
   const st = statsProd(prodId); const tot = sum(cores, c => pn(c.qtd));
   const linhas = cores.filter(c => pn(c.qtd) > 0).map(c => ({...c, q:pn(c.qtd), rolos: st.ppr ? Math.ceil(pn(c.qtd)/st.ppr) : 0}));
@@ -697,37 +709,44 @@ function pedidoForm(){
 function viewInicio(){
   const F = S.F; const ab = Math.max(0, F.aberto); const feito = F.totCob + F.totDesp;
   const confere = Math.abs(feito - F.totRec + F.credito - F.aberto) < 0.02;
-  const sec = SECOES.map(([key,nome]) => { const it = S.lanc.filter(l => l.tipo !== "recebimento" && secaoDe(l) === key); const v = sum(it, l => pn(l.valor)), p = sum(it, l => F.map[l.id]?.pago || 0); return {nome, v, ab: v - p}; }).filter(x => x.ab > 0.005);
-  const ops = sortedOps().filter(o => calc(o).aberta || finOp(o.id, S.F).aberto > 0.005);
-  const ultimo = ops.length ? ops : sortedOps().slice(0,1);
-  return `<div class="welcome">Olá, <b>Thaty ✨</b> · aqui está tudo da sua produção, conta por conta.</div>
-  <div class="card">
-    <div class="lbl">Valor em aberto</div>
-    <div class="big">${brl(ab)}</div>
-    <p class="exp">É a soma de <b>tudo que já foi feito</b> nos seus pedidos (tecido, corte, costura…) e ainda não foi pago. <b>Não é o preço de uma peça</b>: o custo por peça está logo abaixo.</p>
-    <div class="eq"><div><span>Já feito</span><b>${brl(feito)}</b></div><i>−</i><div><span>Você pagou</span><b>${brl(F.totRec)}</b></div><i>=</i><div><span>Em aberto</span><b class="gold">${brl(ab)}</b></div></div>
-    ${F.credito > 0.005 ? `<div class="small muted">Você tem ${brl(F.credito)} de crédito, já descontado.</div>` : ""}
-    ${confere ? `<div class="okline">✓ Conta conferida: todos os valores batem.</div>` : ""}
+  const sec = SECOES.map(([key,nome]) => { const it = S.lanc.filter(l => l.tipo !== "recebimento" && secaoDe(l) === key); const v = sum(it, l => pn(l.valor)), p = sum(it, l => F.map[l.id]?.pago || 0); return {nome, ab: v - p}; }).filter(x => x.ab > 0.005);
+  const all = sortedOps();
+  const pend = all.filter(o => calc(o).aberta || finOp(o.id, F).aberto > 0.005);
+  const prods = [...new Set(all.map(o => o.produtoId))].map(pid => all.find(o => o.produtoId === pid)).filter(Boolean);
+  const nome = adm() ? "Manuel" : "Thaty ✨";
+  return `<div class="welcome">Olá, <b>${nome}</b></div>
+  <div class="card hero2">
+    ${ab > 0.005 ? `<div class="lbl">Falta pagar</div><div class="big">${brl(ab)}</div>
+    <p class="exp">É a soma de tudo o que <b>já foi feito</b> nos seus pedidos e ainda não foi pago. <b>Não é o preço de uma peça.</b></p>` : `<div class="lbl">Sua conta</div><div class="big" style="color:var(--ok)">Tudo pago ✓</div>`}
+    <div class="ln"><span>Já foi feito</span><span class="v">${brl(feito)}</span></div>
+    <div class="ln"><span>Você já pagou</span><span class="v" style="color:var(--ok)">− ${brl(F.totRec)}</span></div>
+    <div class="ln tot"><span>Falta pagar</span><span class="v">${brl(ab)}</span>${F.credito > 0.005 ? `<small>já descontados ${brl(F.credito)} de saldo a seu favor</small>` : ""}</div>
+    ${confere ? `<div class="okline">✓ Contas conferidas: todos os valores batem.</div>` : ""}
+    ${ab > 0.005 ? `<div class="paybox"><div><span>Pix</span><b>${PIX.chave}</b><small>${PIX.banco} · ${PIX.nome}</small></div><button class="btn pri" data-copiar="${PIX.chave}">Copiar chave Pix</button></div>
+    ${!S.readonly ? `<button class="btn ghost sm" data-novo="recebimento" style="align-self:flex-start">Já paguei, quero informar</button>` : ""}` : ""}
   </div>
-  ${sec.length ? `<div class="card"><div class="lbl">De onde vem o valor em aberto</div><div>${sec.map(x => `<div class="ln"><span>${x.nome}</span><span class="v">${brl(x.ab)}</span><small>${x.ab < x.v - 0.005 ? `de ${brl(x.v)} feito, parte já paga` : `já feito, aguardando pagamento`}</small></div>`).join("")}</div><button class="btn sm" data-goto="financeiro">Ver extrato completo →</button></div>` : ""}
+  ${sec.length ? `<details class="card"><summary class="sumrow"><span class="lbl">O que falta pagar</span><span class="small gold">ver ▾</span></summary><div>${sec.map(x => `<div class="ln"><span>${x.nome}</span><span class="v">${brl(x.ab)}</span></div>`).join("")}</div><button class="btn sm" data-goto="financeiro">Ver extrato completo →</button></details>` : ""}
+  ${notifBox()}
+  <div class="row between"><h2>Seus pedidos</h2>${all.length > pend.length ? `<button class="btn ghost sm" data-goto="producoes">Ver todos</button>` : ""}</div>
+  ${pend.length ? `<div class="oplist">${pend.map(opCard).join("")}</div>` : `<div class="empty">Nenhum pedido em andamento.</div>`}
+  ${prods.map(cardPeca).join("")}
   ${pedidosHtml()}
-  ${pixBox()}${notifBox()}
-  ${ultimo.map(o => cardPeca(o)).join("")}
-  <details class="card"><summary class="lbl" style="cursor:pointer">Como funciona a cobrança ▾</summary><div class="how">
+  <details class="card"><summary class="sumrow"><span class="lbl">Como funciona a cobrança</span><span class="small gold">ver ▾</span></summary><div class="how">
     <div><span><b>Tecido</b>: cobrado quando o tecido é comprado, pelo peso (kg × preço do kg).</span></div>
     <div><span><b>Corte</b>: cobrado a cada lote de peças cortadas (peças × valor do corte).</span></div>
-    <div><span><b>Costura</b>: cobrada quando a oficina devolve as peças prontas e eu confiro.</span></div>
+    <div><span><b>Costura</b>: cobrada quando a oficina devolve as peças prontas e são conferidas.</span></div>
     <div><span><b>Assessoria</b>: ${brl(pn(S.cfg.assessoria))} por peça, só depois que as peças são entregues a você.</span></div>
-    <div><span>A cada cobrança você recebe um aviso no celular com o valor e a chave Pix. Todo pagamento seu aparece no extrato.</span></div>
+    <div><span>A cada cobrança você recebe um aviso no celular com o valor e a chave Pix. Todo pagamento aparece no extrato.</span></div>
   </div></details>`;
 }
 function viewProducoes(){
   const all = sortedOps().map(o => ({o, k:calc(o)}));
-  const ab = all.filter(x => x.k.aberta), fe = all.filter(x => !x.k.aberta);
+  const pend = x => x.k.aberta || finOp(x.o.id, S.F).aberto > 0.005;
+  const ab = all.filter(pend), fe = all.filter(x => !pend(x));
   return `<div class="row between"><h1>Pedidos</h1>${S.readonly || !ehManuel() ? "" : `<button class="btn" id="newop">+ Nova produção</button>`}</div>
   ${pedidosHtml()}
   ${ab.length ? `<div class="oplist">${ab.map(x=>opCard(x.o)).join("")}</div>` : `<div class="empty">Nenhum pedido em andamento.</div>`}
-  ${fe.length ? `<details class="mini"><summary>Pedidos entregues (${fe.length})</summary><div class="oplist" style="margin-top:10px">${fe.map(x=>opCard(x.o)).join("")}</div></details>` : ""}`;
+  ${fe.length ? `<details class="mini"><summary>Entregues e pagos (${fe.length})</summary><div class="oplist" style="margin-top:10px">${fe.map(x=>opCard(x.o)).join("")}</div></details>` : ""}`;
 }
 function oficinasResumo(all){
   const map = {};
@@ -800,7 +819,7 @@ function lancRow(l){
 function viewOp(id){
   const op = opById(id); if (!op) return `<div class="empty">Pedido não encontrado. <button class="btn" data-back>Voltar</button></div>`;
   const k = calc(op); const c = op.corte || {}; const f = finOp(op.id, S.F); const fl = fluxo(op, k);
-  const ed = !S.readonly; const q = k.qtd;
+  const ed = adm(); const q = k.qtd;
   const tn = tecidoNecessario(k.prod, q);
   const bar = (a,b) => `<div class="bar"><b style="width:${b?Math.min(100,a/b*100):0}%"></b></div>`;
   const cls = i => i < fl.cur || fl.cur < 0 ? "done" : i === fl.cur ? "now" : "";
@@ -813,7 +832,7 @@ function viewOp(id){
   <div class="card">
     <div class="step ${cls(0)}"><i>${num(0)}</i><div><h2>Tecido</h2>
       <div>${op.retalho ? "Feito com retalho (sem custo de tecido)" : pn(op.kg) ? `<b>${fmt(pn(op.kg),2)} kg</b> × ${brl(pn(op.precoKg))} = <b>${brl(k.custoTecido)}</b>` : `<span class="muted">Ainda não lançado.</span>`}</div>
-      ${tn.consumo ? `<div class="small muted">Cálculo: precisa de ${fmt(tn.kg,1)} kg${tn.rolos?` · ${tn.rolos} rolos`:""}${pn(op.rolos)?` · comprou ${fmt(pn(op.rolos))} rolos`:""}</div>` : ""}
+      ${tn.consumo && adm() ? `<div class="small muted">Cálculo: precisa de ${fmt(tn.kg,1)} kg${tn.rolos?` · ${tn.rolos} rolos`:""}${pn(op.rolos)?` · comprou ${fmt(pn(op.rolos))} rolos`:""}</div>` : ""}
       ${ed && !pn(op.kg) && !op.retalho ? `<div><button class="btn sm pri" id="editop2">Lançar tecido</button></div>` : ""}
     </div></div>
 
@@ -844,17 +863,17 @@ function viewOp(id){
 
   <div class="card"><div class="row between"><h2>Conta deste pedido</h2>${ed?`<button class="btn sm" data-serv="${esc(op.id)}">+ Serviço</button>`:""}</div>
     ${contaHtml(S.lanc.filter(l => l.opId === op.id), op.id)}
-    <div class="small muted">Cobrança automática: tecido ao lançar, corte e costura a cada entrega, assessoria quando as peças são entregues.</div>
+    <div class="small muted">${adm() ? "Cobrança automática: tecido ao lançar, corte e costura a cada entrega, assessoria quando as peças são entregues." : "Toque em cada etapa para ver as contas."}</div>
   </div>
 
-  <details class="mini"><summary>Mais opções do pedido</summary><div class="card" style="margin-top:8px">
+  ${!adm() ? "" : `<details class="mini"><summary>Mais opções do pedido</summary><div class="card" style="margin-top:8px">
     <div class="stats"><div class="stat"><span>Custo real por peça</span><b>${brl(k.realUn)}</b></div><div class="stat"><span>Custo estimado (ficha)</span><b>${brl(k.estUn)}</b></div>${pn(op.rolos)?`<div class="stat"><span>Peças por rolo</span><b>${k.pecasRolo?fmt(k.pecasRolo,1):"—"}</b></div>`:""}</div>
     ${ed?`<div class="row"><button class="btn" id="editop">Editar pedido</button><button class="btn danger" id="delop">Excluir pedido</button></div>`:""}
-  </div></details>
+  </div></details>`}
 `;
 }
 /* Financeiro por sessões: Tecido, Corte, Costura, Serviços e insumos, Assessoria */
-const SECOES = [["Tecido","Tecido"],["Corte","Corte"],["Costura","Costura"],["Servicos","Serviços e insumos"],["Assessoria","Assessoria"]];
+const SECOES = [["Tecido","Tecido"],["Corte","Corte"],["Costura","Costura"],["Servicos","Outros serviços"],["Assessoria","Assessoria"]];
 const secaoDe = l => l.tipo === "despesa" ? "Servicos" : (["Tecido","Corte","Costura","Assessoria"].includes(l.cat) ? l.cat : "Servicos");
 function contaHtml(ls, opId){
   const F = S.F; const ed = !S.readonly;
@@ -878,8 +897,8 @@ function extratoHtml(ls){
   let saldo = 0; const rows = ord.map(l => { const rec = l.tipo === "recebimento"; saldo += rec ? -pn(l.valor) : pn(l.valor); return {l, rec, saldo}; }).reverse();
   if (!rows.length) return "";
   const lim = S.extTodos ? rows : rows.slice(0, 25);
-  return `<div class="card"><h2>Extrato</h2><div class="small muted">Tudo que aconteceu, do mais recente. A coluna da direita mostra quanto ficava em aberto depois de cada lançamento.</div><div>
-    ${lim.map(({l,rec,saldo}) => `<div class="ext"><span class="d">${fdate(l.data).slice(0,5)}</span><span><b>${rec ? "Pagamento recebido ✓" : esc(l.cat || "Serviço")}</b> <span class="small muted">· ${opCode(opById(l.opId))}</span></span><span class="v ${rec?"pg":""}">${rec?"− ":""}${brl(pn(l.valor))}</span><span class="ds">${esc(l.desc||"")}</span><span class="sl">${saldo < -0.005 ? `crédito ${brl(-saldo)}` : `em aberto ${brl(saldo)}`}</span></div>`).join("")}
+  return `<div class="card"><h2>Extrato</h2><div class="small muted">Tudo o que aconteceu, do mais recente para o mais antigo. Embaixo de cada valor aparece como ficou a conta depois dele.</div><div>
+    ${lim.map(({l,rec,saldo}) => `<div class="ext"><span class="d">${fdate(l.data).slice(0,5)}</span><span><b>${rec ? "Pagamento recebido ✓" : esc(l.cat || "Serviço")}</b> <span class="small muted">· ${opCode(opById(l.opId))}</span></span><span class="v ${rec?"pg":""}">${rec?"− ":""}${brl(pn(l.valor))}</span><span class="ds">${esc(l.desc||"")}</span><span class="sl">${saldo < -0.005 ? `saldo a favor ${brl(-saldo)}` : `falta pagar ${brl(saldo)}`}</span></div>`).join("")}
   </div>${rows.length > lim.length ? `<button class="btn sm" id="extall">Ver todos (${rows.length})</button>` : ""}</div>`;
 }
 function viewFinanceiro(){
@@ -888,13 +907,13 @@ function viewFinanceiro(){
   if (fo === "geral") ls = ls.filter(l => !l.opId); else if (fo !== "todas") ls = ls.filter(l => l.opId === fo);
   const recs = ls.filter(l => l.tipo === "recebimento").sort((a,b)=>(b.data||"").localeCompare(a.data||""));
   const opIdF = fo !== "todas" && fo !== "geral" ? fo : "";
-  return `${fo === "todas" ? heroThaty() : ""}
-  <div class="row between"><h1>Extrato</h1>${ed?`<div class="row"><button class="btn" data-novo="recebimento">+ Pagamento</button><button class="btn" data-novo="despesa">+ Serviço</button></div>`:""}</div>
-  <div class="field"><label for="finop">Ver</label><select id="finop"><option value="todas">Todos os pedidos</option><option value="geral" ${fo==="geral"?"selected":""}>Geral (sem pedido)</option>${sortedOps().map(o=>`<option value="${esc(o.id)}" ${fo===o.id?"selected":""}>${opCode(o)} · ${esc(produto(o.produtoId)?.nome||"")}</option>`).join("")}</select></div>
-  <div class="card"><h2>Valor por sessão</h2><div class="small muted">Toque na sessão para ver os detalhes.</div>${contaHtml(ls, opIdF)}</div>
+  const btns = adm() ? `<div class="row"><button class="btn" data-novo="recebimento">+ Pagamento</button><button class="btn" data-novo="despesa">+ Serviço</button></div>` : ed ? `<button class="btn pri" data-novo="recebimento">Informei um pagamento</button>` : "";
+  return `<div class="row between"><h1>Extrato</h1>${btns}</div>
+  <div class="field"><label for="finop">Mostrar</label><select id="finop"><option value="todas">Todos os pedidos</option><option value="geral" ${fo==="geral"?"selected":""}>Serviços gerais (sem pedido)</option>${sortedOps().map(o=>`<option value="${esc(o.id)}" ${fo===o.id?"selected":""}>${opCode(o)} · ${esc(produto(o.produtoId)?.nome||"")}</option>`).join("")}</select></div>
+  <div class="card"><h2>Resumo por etapa</h2><div class="small muted">Toque numa etapa para ver cada lançamento.</div>${contaHtml(ls, opIdF)}</div>
   ${extratoHtml(ls)}
-  <div class="card"><h2>Pagamentos da Thaty</h2>${recs.length ? recs.map(lancRow).join("") : `<div class="small muted">Nenhum pagamento lançado.</div>`}</div>
-  ${ed && fo === "todas" ? oficinasResumo(S.ops.map(o => ({o, k:calc(o)}))) : ""}`;
+  ${adm() ? `<div class="card"><h2>Pagamentos da Thaty</h2>${recs.length ? recs.map(lancRow).join("") : `<div class="small muted">Nenhum pagamento lançado.</div>`}</div>` : ""}
+  ${adm() && fo === "todas" ? oficinasResumo(S.ops.map(o => ({o, k:calc(o)}))) : ""}`;
 }
 function viewMais(){
   return viewCadastros();
