@@ -683,9 +683,9 @@ function custoPeca(op, k){
   if (serv > 0.005) it.push({n:"Serviços do pedido", v: q ? serv/q : 0, d:`modelagem, frete etc. ${brl(serv)} ÷ ${fmt(q)} peças`, p:false});
   return {it, total: sum(it, x => x.v), q};
 }
-function cardPeca(op){
+function cardPeca(op, soNome){
   const k = calc(op); const c = custoPeca(op, k);
-  return `<details class="card"><summary class="sumrow"><div><div class="lbl">Quanto custa cada peça · ${esc(k.prod?.nome || "modelo")}</div><div class="big gold">${brl(c.total)}</div></div><span class="small gold">ver conta ▾</span></summary>
+  return `<details class="card"><summary class="sumrow"><div><div class="lbl">${soNome ? esc(k.prod?.nome || "modelo") + " · custo por peça" : "Quanto custa cada peça · " + esc(k.prod?.nome || "modelo")}</div><div class="big gold">${brl(c.total)}</div></div><span class="small gold">ver conta ▾</span></summary>
     <div>${c.it.map(x => `<div class="ln"><span>${x.n}${x.p?`<span class="prev">previsto</span>`:""}</span><span class="v">${brl(x.v)}</span><small>${x.d}</small></div>`).join("")}
       <div class="ln tot"><span>Total por peça</span><span class="v">${brl(c.total)}</span><small>soma das etapas acima</small></div></div>
   </details>`;
@@ -804,7 +804,7 @@ function viewInicio(){
   ${notifBox()}
   ${!adm() ? "" : `<div class="row between"><h2>Seus pedidos</h2>${all.length > pend.length ? `<button class="btn ghost sm" data-goto="producoes">Ver todos</button>` : ""}</div>
   ${pend.length ? `<div class="oplist">${pend.map(opCard).join("")}</div>` : `<div class="empty">Nenhum pedido em andamento.</div>`}`}
-  ${prods.map(cardPeca).join("")}
+  ${adm() ? prods.map(o => cardPeca(o)).join("") : ""}
   ${adm() ? pedidosHtml() : ""}
   <details class="card"><summary class="sumrow"><span class="lbl">Como funciona a cobrança</span><span class="small gold">ver ▾</span></summary><div class="how">
     <div><span><b>Tecido</b>: cobrado quando o tecido é comprado, pelo peso (kg × preço do kg).</span></div>
@@ -1115,6 +1115,12 @@ function viewOrcamento(){
   <div class="small muted">Fretes de motoboy/carreto, impressão de riscos e modelagem/pilotagem são lançados como reembolso conforme acontecem.</div></div>`;
 }
 
+function viewProdutosThaty(){
+  const ops = sortedOps().filter(o => !pendente(o));
+  const cards = S.produtos.map(p => { const op = ops.find(o => o.produtoId === p.id);
+    return op ? cardPeca(op, true) : `<div class="card"><div class="lbl">${esc(p.nome)} · custo por peça</div><div class="small muted">Ainda sem produção deste modelo. O valor aparece depois do primeiro corte.</div></div>`; });
+  return `<h1>Produtos</h1><div class="small muted" style="margin:-4px 0 10px">Toque em um modelo para ver a conta: tecido, corte, costura e assessoria.</div>${cards.join("") || `<div class="empty">Nenhum produto cadastrado.</div>`}`;
+}
 function viewCadastros(){
   if (!ehManuel()) S.sub = "produtos";
   const sub = S.sub; const ed = !S.readonly && ehManuel();
@@ -1141,7 +1147,7 @@ function viewCadastros(){
     </div><div class="row">${ed?`<button class="btn pri" id="savecfg">Salvar configurações</button>`:""}</div>
     <div class="small muted">O custo fixo por peça substitui o “+2,90” da planilha antiga no custo real.</div></div>`;
   }
-  if (!ehManuel()) return body.replace("<h2>Produtos e ficha de custo</h2>", "<h1>Produtos</h1>");
+  if (!ehManuel()) return viewProdutosThaty();
   return `<h1>Cadastros</h1><div class="subtabs" id="subtabs">${[["insumos","Insumos/serviços"],["produtos","Produtos"],["config","Configurações"]].map(([v,t])=>`<button data-s="${v}" aria-pressed="${sub===v}">${t}</button>`).join("")}</div>${body}`;
 }
 
@@ -1362,7 +1368,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 45;
+const APP_V = 46;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
