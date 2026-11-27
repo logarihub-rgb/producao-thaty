@@ -722,6 +722,7 @@ function pedidoForm(){
   });
 }
 function viewInicio(){
+  syncPagTecido();
   const F = S.F; const ab = Math.max(0, F.aberto); const feito = F.totCob + F.totDesp;
   const confere = Math.abs(feito - F.totRec + F.credito - F.aberto) < 0.02;
   const sec = SECOES.map(([key,nome]) => { const it = S.lanc.filter(l => l.tipo !== "recebimento" && secaoDe(l) === key); const v = sum(it, l => pn(l.valor)), p = sum(it, l => F.map[l.id]?.pago || 0); return {nome, ab: v - p}; }).filter(x => x.ab > 0.005);
@@ -921,6 +922,7 @@ function extratoHtml(ls){
   </div>${rows.length > lim.length ? `<button class="btn sm" id="extall">Ver todos (${rows.length})</button>` : ""}</div>`;
 }
 function viewFinanceiro(){
+  syncPagTecido();
   const F = S.F; const ed = !S.readonly; const fo = S.fin.op;
   let ls = [...S.lanc];
   if (fo === "geral") ls = ls.filter(l => !l.opId); else if (fo !== "todas") ls = ls.filter(l => l.opId === fo);
@@ -935,14 +937,32 @@ function viewFinanceiro(){
   ${adm() && fo === "todas" ? oficinasResumo(S.ops.map(o => ({o, k:calc(o)}))) : ""}`;
 }
 const TEC_API = "https://script.google.com/macros/s/AKfycbyQv3EXg8p4_41qEuMetFS5D7rf9SCjlbpyPJ3i71U3NaOEJM9qj5SaHOn49GnSwUYc/exec";
-async function tecCompras(){
+async function tecCompras(silencioso){
   let pin = localStorage.getItem("tec_pin");
+  if (!pin && silencioso) return [];
   if (!pin){ pin = prompt("Senha (PIN) do app Tecido:"); if (!pin) throw new Error("Sem a senha do app Tecido."); }
   const r = await fetch(TEC_API, {method:"POST", body:JSON.stringify({pin, action:"dados", p:{force:false, ev:""}}), redirect:"follow"});
   const j = await r.json(); if (!j || !j.ok) throw new Error(j?.erro || "Erro no app Tecido");
   try { localStorage.setItem("tec_pin", pin); } catch(e){}
   const d = j.data; const lista = [...(d.vendas||[]), ...((d.inv && d.inv.retiradas)||[])];
   return lista.filter(v => /tha|tati|taty/i.test(v.cliente||"") && (v.rolos||[]).length).sort((a,b) => (b.data||"").localeCompare(a.data||""));
+}
+function syncPagTecido(){
+  if (!adm() || S._tecSync) return; S._tecSync = true;
+  setTimeout(async () => {
+    try {
+      const compras = await tecCompras(true);
+      const ligadas = new Set(S.ops.flatMap(o => (o.rolosTec||[]).map(r => r.k.split("|").slice(0,2).join("|"))));
+      compras.forEach(v => {
+        const ref = `${v.aba}|${v.linha}`; if (!ligadas.has(ref)) return;
+        const id = "tecpag-" + ref.replace(/[^a-z0-9]/gi, "").toLowerCase();
+        const rec = Math.round(pn(v.recebido) * 100) / 100; const ex = S.lanc.find(l => l.id === id);
+        if (rec > 0.005 && (!ex || Math.abs(pn(ex.valor) - rec) > 0.005))
+          write("lanc/" + id, {tipo:"recebimento", opId:"", data: ex?.data || today(), valor: rec, desc:`Pago no app Tecido · compra de ${fdate(v.data)}`, secao:"Tecido", por:"App Tecido", criadoEm: ex?.criadoEm || new Date().toISOString()});
+        else if (rec <= 0.005 && ex) write("lanc/" + id, null);
+      });
+    } catch(e){}
+  }, 1500);
 }
 function rolosUsados(exceto){ const u = {}; S.ops.forEach(o => { if (o.id !== exceto) (o.rolosTec||[]).forEach(r => u[r.k] = opCode(o)); }); return u; }
 async function rolosTecForm(op){
@@ -1279,7 +1299,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 34;
+const APP_V = 35;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
