@@ -787,7 +787,7 @@ function pagFlow(op){
   const g = secsDe(op.id);
   // serviços gerais (sem pedido) lançados depois que o pedido começou também valem para ele
   // cada serviço geral aparece inteiro num pedido só: o último que já tinha começado na data do serviço
-  const donoGer = l => S.ops.filter(o => !pendente(o) && (o.data || "") <= (l.data || "")).sort((a,b) => (a.data||"").localeCompare(b.data||"") || a.num - b.num).pop();
+  const donoGer = l => l.donoOp ? S.ops.find(o => o.id === l.donoOp) : S.ops.filter(o => !pendente(o) && (o.data || "") <= (l.data || "")).sort((a,b) => (a.data||"").localeCompare(b.data||"") || a.num - b.num).pop();
   const ger = S.lanc.filter(l => l.tipo !== "recebimento" && !l.opId && donoGer(l)?.id === op.id);
   const gv = sum(ger, l => pn(l.valor)), gab = sum(ger, l => pn(l.valor) - (S.F.map[l.id]?.pago || 0));
   const etapas = g.todas.map(x => x.key === "Servicos" ? {...x, v: x.v + gv, ab: x.ab + gab, ger: gv > 0.005} : x);
@@ -1442,7 +1442,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 60;
+const APP_V = 61;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
