@@ -675,8 +675,8 @@ function pedidosHtml(){
   return `<div class="card"><div class="row between"><div><div class="lbl">Novo pedido</div><div class="small muted">Monte o próximo pedido por cor e veja na hora o tecido e o custo aproximados.</div></div><button class="btn pri" id="novoped">+ Fazer pedido</button></div>
     ${ps.map(p => { const e = estPedido(p.produtoId, p.cores||[]); return `<details class="oft" ${S.pedAberto===p.id?"open":""}><summary class="row between" style="cursor:pointer"><span><b>${esc(produto(p.produtoId)?.nome||"Modelo")}</b> · ${fmt(e.tot)} pç <span class="small muted">· ${fdate(p.data)}</span></span><span class="chip ${p.status==="aceito"?"s3":"s1"}">${p.status==="aceito"?"Aceito":"Solicitado"}</span></summary>
       <div class="small muted">${(p.cores||[]).map(c => `${esc(c.cor)} ${fmt(pn(c.qtd))}`).join(" · ")}${p.obs?` · ${esc(p.obs)}`:""}</div>${estHtml(e)}
-      <div class="row">${ehManuel() && p.status!=="aceito" ? `<button class="btn sm pri" data-pedst="${esc(p.id)}|aceito">Aceitar</button>` : ""}${ehManuel() && p.status==="aceito" ? `<button class="btn sm pri" data-pedprod="${esc(p.id)}">Virar produção</button>` : ""}${p.status!=="aceito" || ehManuel() ? `<button class="btn sm ghost danger" data-peddel="${esc(p.id)}">Excluir</button>` : ""}</div></details>`; }).join("")}
-    ${prod.length ? `<details class="mini"><summary>Já viraram produção (${prod.length})</summary><div class="small muted" style="margin:6px 0">Cada um vira uma produção (P1, P2…) na lista abaixo.</div>${prod.map(p => { const e = estPedido(p.produtoId, p.cores||[]); return `<div class="row between small" style="padding:8px 0;border-bottom:1px solid var(--line)"><span><b>${esc(produto(p.produtoId)?.nome||"Modelo")}</b> · ${fmt(e.tot)} pç · ${fdate(p.data)}</span>${p.opId && opById(p.opId) ? `<button class="btn sm ghost" data-op="${esc(p.opId)}">Ver ${opCode(opById(p.opId))} →</button>` : ehManuel() ? `<span class="row" style="gap:6px"><button class="btn sm pri" data-pedprod="${esc(p.id)}">Criar produção</button><button class="btn sm ghost" data-pedst="${esc(p.id)}|aceito">Voltar</button></span>` : ""}</div>`; }).join("")}</details>` : ""}
+      <div class="row">${ehManuel() ? `<button class="btn sm pri" data-pedok="${esc(p.id)}">Aceitar e criar produção</button>` : ""}${p.status!=="aceito" || ehManuel() ? `<button class="btn sm ghost danger" data-peddel="${esc(p.id)}">Excluir</button>` : ""}</div></details>`; }).join("")}
+    ${prod.length ? `<details class="mini"><summary>Já viraram produção (${prod.length})</summary><div class="small muted" style="margin:6px 0">Cada um vira uma produção (P1, P2…) na lista abaixo.</div>${prod.map(p => { const e = estPedido(p.produtoId, p.cores||[]); return `<div class="row between small" style="padding:8px 0;border-bottom:1px solid var(--line)"><span><b>${esc(produto(p.produtoId)?.nome||"Modelo")}</b> · ${fmt(e.tot)} pç · ${fdate(p.data)}</span>${p.opId && opById(p.opId) ? `<button class="btn sm ghost" data-op="${esc(p.opId)}">Ver ${opCode(opById(p.opId))} →</button>` : ehManuel() ? `<button class="btn sm pri" data-pedok="${esc(p.id)}">Criar produção</button>` : ""}</div>`; }).join("")}</details>` : ""}
   </div>`;
 }
 function pedidoForm(){
@@ -695,7 +695,7 @@ function pedidoForm(){
     <button class="btn sm" id="pedadd">+ Outra cor</button>
     <div id="pedest"></div>
     <div class="field"><label for="pedobs">Observação (opcional)</label><input id="pedobs" placeholder="Prazo, detalhe de tamanho…"></div>
-    <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="pedcanc">Cancelar</button><button class="btn pri" id="pedok">Enviar pedido</button></div>`, () => {
+    <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="pedcanc">Cancelar</button><button class="btn pri" id="pedok">${adm() ? "Criar produção" : "Enviar pedido"}</button></div>`, () => {
     draw();
     $("#pedprod").onchange = e => { st.prod = e.target.value; draw(); };
     $("#pedadd").onclick = () => { st.cores.push({cor:"",qtd:""}); draw(); };
@@ -703,7 +703,9 @@ function pedidoForm(){
     $("#pedok").onclick = () => {
       const cores = st.cores.filter(c => pn(c.qtd) > 0).map(c => ({cor:(c.cor||"").trim() || "Sem cor", qtd:pn(c.qtd)}));
       if (!cores.length){ toast("Coloque a quantidade de pelo menos uma cor."); return; }
-      write("pedidos/" + uid(), {produtoId:st.prod, cores, obs:$("#pedobs").value.trim(), data:today(), status:"solicitado", por:S.user, criadoEm:new Date().toISOString()});
+      const obs = $("#pedobs").value.trim();
+      if (adm()){ closeModal(); const {id, num} = criarOpDireta(st.prod, cores, obs); toast(`Produção P${num} criada ✓`); go("producoes", id); return; }
+      write("pedidos/" + uid(), {produtoId:st.prod, cores, obs, data:today(), status:"solicitado", por:S.user, criadoEm:new Date().toISOString()});
       closeModal(); toast("Pedido enviado ao Manuel ✨");
     };
   });
@@ -743,12 +745,12 @@ function viewInicio(){
 }
 function viewProducoes(){
   const all = sortedOps().map(o => ({o, k:calc(o)}));
-  const pend = x => x.k.aberta || finOp(x.o.id, S.F).aberto > 0.005;
+  const pend = x => x.k.aberta;
   const ab = all.filter(pend), fe = all.filter(x => !pend(x));
   return `<div class="row between"><h1>Pedidos</h1>${S.readonly || !ehManuel() ? "" : `<button class="btn" id="newop">+ Nova produção</button>`}</div>
   ${pedidosHtml()}
   ${ab.length ? `<div class="oplist">${ab.map(x=>opCard(x.o)).join("")}</div>` : `<div class="empty">Nenhum pedido em andamento.</div>`}
-  ${fe.length ? `<details class="mini"><summary>Entregues e pagos (${fe.length})</summary><div class="oplist" style="margin-top:10px">${fe.map(x=>opCard(x.o)).join("")}</div></details>` : ""}`;
+  ${fe.length ? `<details class="mini"><summary>Entregues (${fe.length})</summary><div class="oplist" style="margin-top:10px">${fe.map(x=>opCard(x.o)).join("")}</div></details>` : ""}`;
 }
 function oficinasResumo(all){
   const map = {};
@@ -1007,6 +1009,20 @@ function viewCadastros(){
 /* ---------- ações ---------- */
 const locais = () => { const s = new Set([S.cfg.corteLocal]); S.ops.forEach(o => { if (o.corte?.local) s.add(o.corte.local); (o.costuras||[]).forEach(t => t.local && s.add(t.local)); }); return [...s].filter(Boolean); };
 
+function criarOpDireta(produtoId, cores, obsExtra){
+  const qtd = sum(cores, c => pn(c.qtd)); const p = produto(produtoId); const tn = tecidoNecessario(p, qtd);
+  const num = Math.max(0, ...S.ops.map(o => o.num||0)) + 1; const id = "op" + uid();
+  const obs = "Cores: " + cores.map(c => `${c.cor} ${fmt(pn(c.qtd))}`).join(" · ") + (obsExtra ? " · " + obsExtra : "");
+  saveOp({id, num, produtoId, data: today(), qtd, kg: r2(tn.kg||0) || "", precoKg: tn.preco || "", rolos: tn.rolos || "", sku:"", retalho:false, obs,
+    corte:{local:S.cfg.corteLocal, custoUn:S.cfg.corteUn, entregas:[], pagamentos:[]}, costuras:[], entregasCliente:[], concluida:false, criadoEm:new Date().toISOString()});
+  return {id, num};
+}
+function aceitarPedido(p){
+  const cores = (p.cores||[]).filter(c => pn(c.qtd) > 0); if (!cores.length) return;
+  const {id, num} = criarOpDireta(p.produtoId, cores, p.obs);
+  const {id:_, ...d} = p; write("pedidos/" + p.id, {...d, status:"produzindo", opId:id});
+  toast(`Pedido aceito: virou a produção P${num} ✓`); go("producoes", id);
+}
 function opForm(op, pre, after){
   if (!S.produtos.length){ toast("Cadastre um produto antes."); return; }
   const novo = !op;
@@ -1044,6 +1060,9 @@ function bind(){
   const ea = $("#extall"); if (ea) ea.onclick = () => { S.extTodos = true; render(); };
   const npd = $("#novoped"); if (npd) npd.onclick = pedidoForm;
   document.querySelectorAll("[data-pedst]").forEach(b => b.onclick = e => { e.stopPropagation(); const [id, s] = b.dataset.pedst.split("|"); const p = S.pedidos.find(x => x.id === id); if (!p) return; const {id:_, ...d} = p; const go_ = () => { S.pedAberto = id; write("pedidos/" + id, {...d, status:s}); toast(s === "aceito" ? "Pedido aceito ✓" : s === "produzindo" ? "Movido para 'Já viraram produção'" : "Feito"); }; if (s === "produzindo") confirmBox("Este pedido já virou produção? Ele sai da lista e fica em 'Já viraram produção'.", go_); else go_(); });
+  document.querySelectorAll("[data-pedok]").forEach(b => b.onclick = e => { e.stopPropagation(); const p = S.pedidos.find(x => x.id === b.dataset.pedok); if (!p) return;
+    const n = Math.max(0, ...S.ops.map(o => o.num||0)) + 1;
+    confirmBox(`Aceitar e criar a produção P${n} com ${fmt(sum(p.cores||[], c => pn(c.qtd)))} peças?`, () => aceitarPedido(p)); });
   document.querySelectorAll("[data-pedprod]").forEach(b => b.onclick = e => { e.stopPropagation(); const p = S.pedidos.find(x => x.id === b.dataset.pedprod); if (!p) return;
     const cores = (p.cores||[]).filter(c => pn(c.qtd) > 0); const qtd = sum(cores, c => pn(c.qtd));
     const obs = "Cores: " + cores.map(c => `${c.cor} ${fmt(pn(c.qtd))}`).join(" · ") + (p.obs ? " · " + p.obs : "");
