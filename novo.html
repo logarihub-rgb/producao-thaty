@@ -559,7 +559,7 @@ function render(){
   if (!COLS.every(c => S.loaded[c])){ m.innerHTML = `<div class="empty">Carregando dados da produção…</div>`; return; }
   S.F = finance();
   const ro = S.readonly ? `<div class="note">Você está vendo em modo leitura: sua conta não tem permissão para editar.</div>` : "";
-  if (S.view === "financeiro" && S.user && !ehManuel()) S.view = "inicio";
+  if (S.view === "financeiro" && S.user) S.view = "inicio";
   const html = S.view === "inicio" ? viewInicio() : S.view === "financeiro" ? viewFinanceiro()
     : S.view === "mais" ? viewMais()
     : (S.opId ? viewOp(S.opId) : viewProducoes());
@@ -600,10 +600,15 @@ function fluxo(op, k){
   else { nx = `<b>Pedido concluído</b>`; ok = true; }
   return {html, next:`<div class="next ${ok?"ok":""}">${nx}</div>`, cur};
 }
+function fimOp(op, k){
+  if (!k.aberta || op.concluida){ const ds = (op.costuras || []).flatMap(t => t.entregas || []).map(e => e.data).filter(Boolean).sort();
+    const d = op.concluidaEm || ds[ds.length - 1]; return d ? `Término ${fdate(String(d).slice(0,10))}` : "Concluído"; }
+  return "em andamento";
+}
 function opCard(op){
   const k = calc(op); const f = finOp(op.id, S.F); const fl = fluxo(op, k);
   return `<button class="op" data-op="${esc(op.id)}">
-    <div class="row between"><div class="row" style="gap:8px"><span class="code">${opCode(op)}</span><div><b>${esc(k.prod?.nome || "Produto removido")}</b><div class="small muted">${fmt(k.qtd)} peças · ${fdate(op.data)}</div></div></div></div>
+    <div class="row between"><div class="row" style="gap:8px"><span class="code">${opCode(op)}</span><div><b>${esc(k.prod?.nome || "Produto removido")}</b><div class="small muted">${fmt(k.qtd)} peças</div><div class="small muted">Início ${fdate(op.data)} · ${fimOp(op, k)}</div></div></div></div>
     ${fl.html}${fl.next}
     ${pendente(op) ? "" : pagFlow(op)}
     ${pendente(op) ? `<div class="row between small"><span class="muted">Cores</span><b>${esc((op.obs||"").replace(/^Cores: /,"").split(" · ").slice(0,4).join(" · "))}</b></div>` : `<div class="row between small"><span class="muted">${f.aberto>0.005?"Falta pagar deste pedido":"Pedido pago"}</span><b class="num" style="color:${f.aberto>0.005?"var(--warn)":"var(--ok)"}">${f.aberto>0.005?brl(f.aberto):"✓"}</b></div>`}
@@ -691,7 +696,8 @@ function cardPeca(op, soNome){
   const k = calc(op); const c = custoPeca(op, k);
   return `<details class="card"><summary class="sumrow"><div><div class="lbl">${soNome ? esc(k.prod?.nome || "modelo") + " · custo por peça" : "Quanto custa cada peça · " + esc(k.prod?.nome || "modelo")}</div><div class="big gold">${brl(c.total)}</div></div><span class="small gold">ver conta ▾</span></summary>
     <div>${c.it.map(x => `<div class="ln"><span>${x.n}${x.p?`<span class="prev">previsto</span>`:""}</span><span class="v">${brl(x.v)}</span><small>${x.d}</small></div>`).join("")}
-      <div class="ln tot"><span>Total por peça</span><span class="v">${brl(c.total)}</span><small>soma das etapas acima</small></div></div>
+      <div class="ln tot"><span>Total por peça</span><span class="v">${brl(c.total)}</span><small>soma das etapas acima</small></div>
+      ${soNome && adm() && k.prod ? `<button class="btn sm pri" data-prod="${esc(k.prod.id)}" style="margin-top:10px">✏️ Editar produto (insumos, etiqueta, rendimento)</button>` : ""}</div>
   </details>`;
 }
 const ehManuel = () => !/thaty/i.test(S.user || "");
@@ -806,6 +812,14 @@ function viewInicio(){
   const abV = adm() ? ab : sum(porOp, g => g.tot);
   const prods = [...new Set(all.map(o => o.produtoId))].map(pid => all.find(o => o.produtoId === pid)).filter(Boolean);
   const nome = adm() ? "Manuel" : "Thaty ✨";
+  if (adm()){
+    const tot = sum(S.ops.filter(o => !pendente(o)), o => secsDe(o.id).tot) + secsDe("").tot;
+    return `<h1>Pagamentos</h1><div class="card hero2">
+      ${tot > 0.005 ? `<div class="lbl">Falta a Thaty pagar</div><div class="big">${brl(tot)}</div>` : `<div class="lbl">Conta da Thaty</div><div class="big" style="color:var(--ok)">Tudo pago ✓</div>`}
+      <div class="ln"><span>Já foi feito</span><span class="v">${brl(feito)}</span></div>
+      <div class="ln"><span>Ela já pagou</span><span class="v" style="color:var(--ok)">− ${brl(F.totRec)}</span></div>
+    </div>${notifBox()}${viewFinanceiro()}`;
+  }
   if (!adm()){
     const tot = sum(S.ops.filter(o => !pendente(o)), o => secsDe(o.id).tot) + secsDe("").tot;
     return `<h1>Pagamentos</h1><div class="card hero2">
@@ -1085,8 +1099,11 @@ async function rolosTecForm(op){
 }
 function linkThaty(){ return location.origin + location.pathname.replace(/[^/]*$/,"") + "novo.html?k=" + THATY_K + "&v=" + APP_V; }
 function viewMais(){
-  return `${viewCadastros()}
-  ${adm() ? `<details class="mini"><summary>Link do app da Thaty</summary><div class="card" style="margin-top:8px"><div class="small muted">Ela só precisa instalar uma vez. Quando sair versão nova, o app dela mostra "toque para atualizar" sozinho.</div><div style="word-break:break-all;font-size:13px;margin:8px 0">${esc(linkThaty())}</div><button class="btn pri" data-copiar="${esc(linkThaty())}">Copiar link</button></div></details>` : ""}`;
+  if (!ehManuel()) return viewCadastros();
+  return `${viewProdutosThaty()}
+  <details class="card" ${S.cadAberto ? "open" : ""} ontoggle="S.cadAberto=this.open" style="margin-top:10px"><summary class="sumrow"><span class="lbl">⚙️ Cadastros, configurações e link da Thaty</span><span class="small gold">ver ▾</span></summary>
+  ${viewCadastros()}
+  ${adm() ? `<details class="mini"><summary>Link do app da Thaty</summary><div class="card" style="margin-top:8px"><div class="small muted">Ela só precisa instalar uma vez. Quando sair versão nova, o app dela mostra "toque para atualizar" sozinho.</div><div style="word-break:break-all;font-size:13px;margin:8px 0">${esc(linkThaty())}</div><button class="btn pri" data-copiar="${esc(linkThaty())}">Copiar link</button></div></details>` : ""}</details>`;
 }
 function lancForm(tipo, l, opIdDefault, extra0 = {}){
   const novo = !l;
@@ -1147,8 +1164,8 @@ function viewOrcamento(){
 function viewProdutosThaty(){
   const ops = sortedOps().filter(o => !pendente(o));
   const cards = S.produtos.map(p => { const op = ops.find(o => o.produtoId === p.id);
-    return op ? cardPeca(op, true) : `<div class="card"><div class="lbl">${esc(p.nome)} · custo por peça</div><div class="small muted">Ainda sem produção deste modelo. O valor aparece depois do primeiro corte.</div></div>`; });
-  return `<h1>Produtos</h1><div class="small muted" style="margin:-4px 0 10px">Toque em um modelo para ver a conta: tecido, corte, costura e assessoria.</div>${cards.join("") || `<div class="empty">Nenhum produto cadastrado.</div>`}`;
+    return op ? cardPeca(op, true) : `<div class="card"><div class="lbl">${esc(p.nome)} · custo por peça</div><div class="small muted">Ainda sem produção deste modelo. O valor aparece depois do primeiro corte.</div>${adm() ? `<button class="btn sm pri" data-prod="${esc(p.id)}" style="margin-top:10px;align-self:flex-start">✏️ Editar produto</button>` : ""}</div>`; });
+  return `<div class="row between"><h1>Produtos</h1>${adm() ? `<button class="btn pri sm" id="newprod">+ Novo produto</button>` : ""}</div><div class="small muted" style="margin:-4px 0 10px">Toque em um modelo para ver a conta: tecido, corte, costura e assessoria.</div>${cards.join("") || `<div class="empty">Nenhum produto cadastrado.</div>`}`;
 }
 function viewCadastros(){
   if (!ehManuel()) S.sub = "produtos";
@@ -1397,7 +1414,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 48;
+const APP_V = 50;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
@@ -1428,12 +1445,12 @@ function arrumaAbas(){
   const bi = nav.querySelector('[data-v="inicio"]'), bp = nav.querySelector('[data-v="producoes"]');
   if (!bi || !bp) return;
   const bm = nav.querySelector('[data-v="mais"]'), bf = nav.querySelector('[data-v="financeiro"]');
-  if (bf) bf.hidden = !ehManuel();
+  if (bf) bf.hidden = true;
   if (!ehManuel()){ bi.textContent = "Pagamentos"; nav.insertBefore(bp, bi); if (bm) bm.textContent = "Produtos"; }
-  else { bi.textContent = "Início"; nav.insertBefore(bi, bp); if (bm) bm.textContent = "Mais"; }
+  else { bi.textContent = "Pagamentos"; nav.insertBefore(bp, bi); if (bm) bm.textContent = "Produtos"; }
 }
 function entrou(){
-  arrumaAbas(); if (!ehManuel() && !S._abriu){ S.view = "producoes"; S.opId = null; } S._abriu = true;
+  arrumaAbas(); if (!S._abriu){ S.view = "producoes"; S.opId = null; } S._abriu = true;
   const w = $("#who"); w.hidden = false; w.textContent = S.user + " · trocar"; w.onclick = () => sair();
   render(); carregar(); checarPush();
   clearInterval(S.poll); S.poll = setInterval(checar, 25000);
