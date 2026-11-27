@@ -790,9 +790,10 @@ function pagFlow(op){
   const donoGer = l => l.donoOp ? S.ops.find(o => o.id === l.donoOp) : S.ops.filter(o => !pendente(o) && (o.data || "") <= (l.data || "")).sort((a,b) => (a.data||"").localeCompare(b.data||"") || a.num - b.num).pop();
   const ger = S.lanc.filter(l => l.tipo !== "recebimento" && !l.opId && donoGer(l)?.id === op.id);
   const gv = sum(ger, l => pn(l.valor)), gab = sum(ger, l => pn(l.valor) - (S.F.map[l.id]?.pago || 0));
-  const etapas = g.todas.map(x => x.key === "Servicos" ? {...x, v: x.v + gv, ab: x.ab + gab, ger: gv > 0.005} : x);
+  const et0 = g.todas.map(x => x.key === "Servicos" ? {...x, v: x.v + gv, ab: x.ab + gab, ger: gv > 0.005} : x);
+  const etapas = [...et0.filter(x => x.key === "Servicos"), ...et0.filter(x => x.key !== "Servicos")]; // Serviços gerais primeiro
   const serv = S.lanc.filter(l => l.tipo !== "recebimento" && l.opId === op.id && secaoDe(l) === "Servicos");
-  return `<div class="paylbl">Pagamentos · ${opCode(op)}</div><div class="flow ${etapas.length > 4 ? "f5" : ""}">${etapas.map((x, ix) => { const ret = x.key === "Tecido" && op.retalho && x.v <= 0.005; const pagoAte = etapas.slice(0, ix).every(y => (y.key === "Tecido" && op.retalho && y.v <= 0.005) || (y.v > 0.005 && y.ab <= 0.005));
+  return `<div class="paylbl">Pagamentos · ${opCode(op)}</div><div class="flow ${etapas.length > 4 ? "f5" : ""}">${etapas.map((x, ix) => { const ret = x.key === "Tecido" && op.retalho && x.v <= 0.005; const pagoAte = (ix === 0 ? etapas.slice(1, 2) : etapas.slice(0, ix)).every(y => (y.key === "Tecido" && op.retalho && y.v <= 0.005) || (y.v > 0.005 && y.ab <= 0.005));
       const semServ = x.key === "Servicos" && x.v <= 0.005 && pagoAte; const st = ret || semServ ? "done" : x.v <= 0.005 ? "" : x.ab > 0.005 ? "now" : "done";
     return `<div class="fs ${st}"><i>$</i><b>${x.nome === "Outros serviços" ? "Serviços gerais" : x.nome}</b><small>${ret ? "retalho ✓" : semServ ? "nenhum ✓" : !st ? (x.key === "Servicos" ? "nenhum" : "a lançar") : st === "done" ? "pago ✓" : brl(x.ab)}</small></div>`; }).join("")}</div>
     ${serv.map(l => { const a = pn(l.valor) - (S.F.map[l.id]?.pago || 0); return `<div class="row between small"><span>${esc(l.desc || "Serviço")} <span class="muted">· ${opCode(op)}</span></span><span>${a > 0.005 ? brl(a) : "pago ✓"}</span></div>`; }).join("")}`;
@@ -1442,7 +1443,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 61;
+const APP_V = 62;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
