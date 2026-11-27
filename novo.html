@@ -285,6 +285,7 @@ details.card[open] .sumrow .gold:last-child{opacity:.6}
 .rt.off{opacity:.4}.rt small{font-size:10px;color:var(--muted)}.rt span{color:var(--muted);font-size:12px}
 .sl input[type=range]{width:100%;accent-color:var(--accent);height:28px}
 .sl{border-bottom:1px solid var(--line);padding-bottom:8px}
+.fp{padding:10px 0;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:3px}.fp:last-of-type{border-bottom:0}
 </style>
 </head>
 <body>
@@ -742,12 +743,16 @@ function viewInicio(){
   const sec = SECOES.map(([key,nome]) => { const it = S.lanc.filter(l => l.tipo !== "recebimento" && secaoDe(l) === key); const v = sum(it, l => pn(l.valor)), p = sum(it, l => F.map[l.id]?.pago || 0); return {nome, ab: v - p}; }).filter(x => x.ab > 0.005);
   const all = sortedOps();
   const pend = all.filter(o => calc(o).aberta || finOp(o.id, F).aberto > 0.005);
+  const porOp = [...all.filter(o => !pendente(o)).map(o => ({nome:`${opCode(o)} · ${produto(o.produtoId)?.nome || ""}`, id:o.id})), {nome:"Serviços gerais (sem pedido)", id:""}]
+    .map(g => { const ls = S.lanc.filter(l => l.tipo !== "recebimento" && (l.opId || "") === g.id);
+      const secs = SECOES.map(([key,nome]) => ({nome, ab: sum(ls.filter(l => secaoDe(l) === key), l => pn(l.valor) - (F.map[l.id]?.pago || 0))})).filter(x => x.ab > 0.005);
+      return {...g, secs, tot: sum(secs, x => x.ab)}; }).filter(g => g.tot > 0.005);
   const prods = [...new Set(all.map(o => o.produtoId))].map(pid => all.find(o => o.produtoId === pid)).filter(Boolean);
   const nome = adm() ? "Manuel" : "Thaty ✨";
   return `<div class="welcome">Olá, <b>${nome}</b></div>
   <div class="card hero2">
     ${ab > 0.005 ? `<div class="lbl">Falta pagar</div><div class="big">${brl(ab)}</div>
-    <p class="exp">É a soma de tudo o que <b>já foi feito</b> nos seus pedidos e ainda não foi pago. <b>Não é o preço de uma peça.</b></p>` : `<div class="lbl">Sua conta</div><div class="big" style="color:var(--ok)">Tudo pago ✓</div>`}
+` : `<div class="lbl">Sua conta</div><div class="big" style="color:var(--ok)">Tudo pago ✓</div>`}
     <div class="ln"><span>Já foi feito</span><span class="v">${brl(feito)}</span></div>
     <div class="ln"><span>Você já pagou</span><span class="v" style="color:var(--ok)">− ${brl(F.totRec)}</span></div>
     <div class="ln tot"><span>Falta pagar</span><span class="v">${brl(ab)}</span>${F.credito > 0.005 ? `<small>já descontados ${brl(F.credito)} de saldo a seu favor</small>` : ""}</div>
@@ -755,7 +760,7 @@ function viewInicio(){
     ${ab > 0.005 ? `<div class="paybox"><div><span>Pix</span><b>${PIX.chave}</b><small>${PIX.banco} · ${PIX.nome}</small></div><button class="btn pri" data-copiar="${PIX.chave}">Copiar chave Pix</button></div>
     ${!S.readonly ? `<button class="btn ghost sm" data-novo="recebimento" style="align-self:flex-start">Já paguei, quero informar</button>` : ""}` : ""}
   </div>
-  ${sec.length ? `<details class="card"><summary class="sumrow"><span class="lbl">O que falta pagar</span><span class="small gold">ver ▾</span></summary><div>${sec.map(x => `<div class="ln"><span>${x.nome}</span><span class="v">${brl(x.ab)}</span></div>`).join("")}</div><button class="btn sm" data-goto="financeiro">Ver extrato completo →</button></details>` : ""}
+  ${porOp.length ? `<div class="card"><div class="lbl">O que falta pagar, por pedido</div>${porOp.map(g => `<div class="fp"><div class="row between"><b>${esc(g.nome)}</b><b class="gold">${brl(g.tot)}</b></div>${g.secs.map(x => `<div class="row between small"><span class="muted">${x.nome}</span><span>${brl(x.ab)}</span></div>`).join("")}</div>`).join("")}<button class="btn sm" data-goto="financeiro">Ver extrato completo →</button></div>` : ""}
   ${notifBox()}
   ${!adm() ? "" : `<div class="row between"><h2>Seus pedidos</h2>${all.length > pend.length ? `<button class="btn ghost sm" data-goto="producoes">Ver todos</button>` : ""}</div>
   ${pend.length ? `<div class="oplist">${pend.map(opCard).join("")}</div>` : `<div class="empty">Nenhum pedido em andamento.</div>`}`}
@@ -1313,7 +1318,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 36;
+const APP_V = 37;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
