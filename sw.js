@@ -6,7 +6,10 @@ self.addEventListener('fetch',e=>{
   const u=new URL(e.request.url);
   if(e.request.method!=='GET'||u.origin!==location.origin)return;
   // abre do celular na hora e atualiza por trás para a próxima vez
-  const K=u.origin+u.pathname;e.respondWith(caches.match(K).then(m=>{const rede=fetch(e.request).then(r=>{if(r.ok){const cp=r.clone();caches.open(C).then(c=>c.put(K,cp))}return r}).catch(()=>m||caches.match('index.html'));if(m){e.waitUntil(rede);return m}return rede}));
+  const K=u.origin+u.pathname;
+  // checagem de versão: sempre da rede, e já guarda a versão nova pro próximo abrir
+  if(u.searchParams.has('fresh')){e.respondWith(fetch(e.request,{cache:'no-store'}).then(r=>{if(r.ok){const cp=r.clone();e.waitUntil(caches.open(C).then(c=>c.put(K,cp)))}return r}));return}
+e.respondWith(caches.match(K).then(m=>{const rede=fetch(e.request).then(r=>{if(r.ok){const cp=r.clone();caches.open(C).then(c=>c.put(K,cp))}return r}).catch(()=>m||caches.match('index.html'));if(m){e.waitUntil(rede);return m}return rede}));
 });
 
 /* ===== Notificações ===== */

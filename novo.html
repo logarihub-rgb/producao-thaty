@@ -286,6 +286,7 @@ details.card[open] .sumrow .gold:last-child{opacity:.6}
 .sl input[type=range]{width:100%;accent-color:var(--accent);height:28px}
 .sl{border-bottom:1px solid var(--line);padding-bottom:8px}
 .fp{padding:10px 0;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:3px}.fp:last-of-type{border-bottom:0}
+#updbar{position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:9999;padding:14px 16px;border-radius:14px;border:1px solid #c9a35a;background:#c9a35a;color:#14110c;font:600 15px system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.5);cursor:pointer}
 </style>
 </head>
 <body>
@@ -1016,7 +1017,7 @@ async function rolosTecForm(op){
 function linkThaty(){ return location.origin + location.pathname.replace(/[^/]*$/,"") + "novo.html?k=" + THATY_K + "&v=" + APP_V; }
 function viewMais(){
   return `${viewCadastros()}
-  ${adm() ? `<details class="mini"><summary>Link do app da Thaty</summary><div class="card" style="margin-top:8px"><div class="small muted">Sempre na versão mais nova (v${APP_V}). Mande este link para ela quando tiver atualização.</div><div style="word-break:break-all;font-size:13px;margin:8px 0">${esc(linkThaty())}</div><button class="btn pri" data-copiar="${esc(linkThaty())}">Copiar link</button></div></details>` : ""}`;
+  ${adm() ? `<details class="mini"><summary>Link do app da Thaty</summary><div class="card" style="margin-top:8px"><div class="small muted">Ela só precisa instalar uma vez. Quando sair versão nova, o app dela mostra "toque para atualizar" sozinho.</div><div style="word-break:break-all;font-size:13px;margin:8px 0">${esc(linkThaty())}</div><button class="btn pri" data-copiar="${esc(linkThaty())}">Copiar link</button></div></details>` : ""}`;
 }
 function lancForm(tipo, l, opIdDefault, extra0 = {}){
   const novo = !l;
@@ -1318,7 +1319,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 37;
+const APP_V = 38;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
@@ -1377,6 +1378,25 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) chec
 new MutationObserver(() => { if (!$("#modal-root").innerHTML && S.pending){ S.pending = false; render(); } }).observe($("#modal-root"), {childList:true});
 $("#fab").onclick = () => lancForm("despesa", null, S.view === "producoes" && S.opId ? S.opId : "");
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+let _novaV = 0;
+async function checaVersao(){
+  try {
+    const t = await (await fetch("novo.html?fresh=" + Date.now(), {cache:"no-store"})).text();
+    const v = +((t.match(/const APP_V = (\d+)/) || [])[1] || 0);
+    if (v > APP_V && v !== _novaV) { _novaV = v; mostraAtualizar(); }
+  } catch(e) {}
+  try { (await navigator.serviceWorker?.getRegistration())?.update(); } catch(e) {}
+}
+function mostraAtualizar(){
+  if (document.getElementById("updbar")) return;
+  const b = document.createElement("button"); b.id = "updbar"; b.type = "button";
+  b.innerHTML = "✨ <b>Nova versão do app</b> · toque para atualizar";
+  b.onclick = () => { b.textContent = "Atualizando…"; location.reload(); };
+  document.body.appendChild(b);
+}
+setTimeout(checaVersao, 2500);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checaVersao(); });
+setInterval(checaVersao, 5 * 60 * 1000);
 (function init(){
   const h = location.hash.slice(1); if (VIEWS.includes(h)) S.view = h;
   const p = store.get("pt_pin");
