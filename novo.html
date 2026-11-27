@@ -296,6 +296,7 @@ details.ent>summary .entv{color:#c9a35a;font-size:13px}details.ent>summary .entv
 html,body{overflow-x:hidden;max-width:100%}
 #who{max-width:42vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .flow .fs{min-width:0}.flow .fs small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}.flow .fs b{white-space:normal;line-height:1.15;text-align:center;letter-spacing:-.2px}
+.insrow{display:grid;grid-template-columns:2fr 1fr .8fr 1fr auto;gap:6px;align-items:center}.insrow input{min-width:0;width:100%;background:var(--bg);border:1px solid var(--line);color:inherit;border-radius:8px;padding:8px}.insrow.insh{margin-bottom:-4px}
 </style>
 </head>
 <body>
@@ -395,7 +396,14 @@ const saveLanc = l => { const {id, ...d} = l; return write("lanc/"+id, d); };
 /* ---------- cálculos ---------- */
 const insumo = id => S.insumos.find(i => i.id === id);
 const produto = id => S.produtos.find(p => p.id === id);
-const custoProduto = p => p ? sum(p.itens, it => pn(it.qtd) * (insumo(it.insumoId)?.valor || 0)) : 0;
+// item do produto: novo formato {nome, valor, un} (valor pago por "un" unidades) ou antigo {insumoId, qtd}
+const itemNorm = it => { if (it.nome !== undefined) return {nome: it.nome, valor: pn(it.valor), un: pn(it.un) || 1};
+  const i = insumo(it.insumoId), q = pn(it.qtd) || 1, v = pn(i?.valor);
+  return q >= 1 ? {nome: i?.nome || "Removido", valor: +(v * q).toFixed(4), un: 1} : {nome: i?.nome || "Removido", valor: v, un: Math.round(1 / q)}; };
+const itemCusto = it => { const n = itemNorm(it); return n.valor / (n.un || 1); };
+const itemInfo = it => { const n = itemNorm(it); return {nome: n.nome, tipo: "", un: n.un > 1 ? `${fmt(n.un)} un` : "un", valor: n.valor / (n.un || 1)}; };
+const brlPc = v => v > 0 && v < 0.1 ? "R$ " + v.toFixed(3).replace(".", ",") : brl(v);
+const custoProduto = p => p ? sum(p.itens, itemCusto) : 0;
 const opById = id => S.ops.find(o => o.id === id);
 const opCode = op => op ? "P" + op.num : "Geral";
 
@@ -1173,7 +1181,7 @@ function viewOrcamento(){
     <div class="kpi alert"><span>Tecido necessário</span><b>${tn.consumo?fmt(tn.kg,1)+" kg":"—"}</b><small>${tn.consumo?`${tn.rolos||"—"} rolos · ${brl(tn.valor)} a ${brl(tn.preco)}/kg`:"defina o consumo no produto"}</small></div>
   </div>
   <div class="tbl-wrap"><table><thead><tr><th>Insumo / serviço</th><th>Tipo</th><th>Un.</th><th class="r">Qtd/pç</th><th class="r">Valor un.</th><th class="r">Qtd total</th><th class="r">Valor total</th></tr></thead><tbody>
-  ${(p.itens||[]).map(it=>{const i=insumo(it.insumoId); const qq=pn(it.qtd); return `<tr><td>${esc(i?.nome||"Removido")}</td><td>${esc(i?.tipo||"")}</td><td>${esc(i?.un||"")}</td><td class="r">${fmt(qq,3)}</td><td class="r">${brl(i?.valor||0)}</td><td class="r">${fmt(qq*q)}</td><td class="r">${brl(qq*(i?.valor||0)*q)}</td></tr>`}).join("")}
+  ${(p.itens||[]).map(it=>{const i=itemInfo(it); const qq=it.nome!==undefined?1:1; return `<tr><td>${esc(i?.nome||"Removido")}</td><td>${esc(i?.tipo||"")}</td><td>${esc(i?.un||"")}</td><td class="r">${fmt(qq,3)}</td><td class="r">${brl(i?.valor||0)}</td><td class="r">${fmt(qq*q)}</td><td class="r">${brl(qq*(i?.valor||0)*q)}</td></tr>`}).join("")}
   </tbody><tfoot><tr><td colspan="6">Total</td><td class="r">${brl(un*q)}</td></tr></tfoot></table></div>
   <div class="small muted">Fretes de motoboy/carreto, impressão de riscos e modelagem/pilotagem são lançados como reembolso conforme acontecem.</div></div>`;
 }
@@ -1197,7 +1205,7 @@ function viewCadastros(){
     ${S.produtos.length?S.produtos.map(p=>`<div class="card" style="padding:12px"><div class="row between"><div><b>${esc(p.nome)}</b>${p.sku?` <span class="small muted">SKU ${esc(p.sku)}</span>`:""}
       <div class="small muted">Consumo ${p.consumoKg?fmt(pn(p.consumoKg),3)+" kg/pç":"não definido"} · rolo ${p.kgRolo?fmt(pn(p.kgRolo),1)+" kg":"—"} · ${(()=>{const t=statsProd(p.id);return t.pprReal?`<b>${fmt(t.pprReal,0)} pç/rolo</b> (medido no corte)`:t.pprCad?`${fmt(t.pprCad,0)} pç/rolo (estimado)`:"pç/rolo: ainda sem corte"})()} · tecido ${p.precoKg?brl(pn(p.precoKg))+"/kg":"—"}</div></div>
       <div class="row"><b class="num">${brl(custoProduto(p))}</b>${ed?`<button class="btn sm" data-prod="${esc(p.id)}">Editar</button>`:""}</div></div>
-    <div class="tbl-wrap"><table><tbody>${(p.itens||[]).map(it=>{const i=insumo(it.insumoId);return `<tr><td>${esc(i?.nome||"Removido")}</td><td class="muted">${esc(i?.tipo||"")}</td><td class="r">${fmt(pn(it.qtd),3)} ${esc(i?.un||"")}</td><td class="r">${brl(pn(it.qtd)*(i?.valor||0))}</td></tr>`}).join("")}</tbody></table></div></div>`).join(""):`<div class="empty">Nenhum produto cadastrado.</div>`}`;
+    <div class="tbl-wrap"><table><tbody>${(p.itens||[]).map(it=>{const i=itemInfo(it);return `<tr><td>${esc(i?.nome||"Removido")}</td><td class="muted">${esc(i?.tipo||"")}</td><td class="r">${fmt(pn(it.qtd),3)} ${esc(i?.un||"")}</td><td class="r">${brl(pn(it.qtd)*(i?.valor||0))}</td></tr>`}).join("")}</tbody></table></div></div>`).join(""):`<div class="empty">Nenhum produto cadastrado.</div>`}`;
   } else {
     const c = S.cfg;
     body = `<h2>Configurações</h2><div class="card"><div class="fgrid">
@@ -1394,45 +1402,39 @@ function insForm(i){
 }
 
 function prodForm(p){
-  let itens = clone(p?.itens || []); const novosIns = [];
-  const opts = id => S.insumos.map(i=>`<option value="${esc(i.id)}" ${i.id===id?"selected":""}>${esc(i.nome)} (${brl(i.valor)})</option>`).join("");
-  const rows = () => itens.map((it,ix)=>`<div class="row" style="flex-wrap:nowrap"><select class="grow" data-ii="${ix}" aria-label="Insumo ${ix+1}" style="min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px">${opts(it.insumoId)}</select><input data-iq="${ix}" aria-label="Quantidade ${ix+1}" inputmode="decimal" value="${esc(String(it.qtd).replace(".",","))}" style="width:70px;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px"><button class="btn sm ghost" data-ir="${ix}" aria-label="Remover">×</button></div>`).join("");
+  const base = p ? (p.itens || []) : ((S.produtos[S.produtos.length - 1] || {}).itens || []);
+  let itens = base.map(itemNorm);
+  const rows = () => itens.map((it,ix)=>`<div class="insrow"><input data-in="${ix}" placeholder="Nome (ex.: etiqueta)" value="${esc(it.nome)}"><input data-iv="${ix}" inputmode="decimal" placeholder="Valor R$" value="${it.valor ? String(it.valor).replace(".", ",") : ""}"><input data-iu="${ix}" inputmode="decimal" placeholder="Unid." value="${it.un || 1}"><span class="small num">${brlPc((it.valor||0)/(it.un||1))}/pç</span><button class="btn sm ghost" data-ir="${ix}" type="button" aria-label="Remover">✕</button></div>`).join("");
   modal(`<h2>${p?"Editar produto":"Novo produto"}</h2>
     <div class="fgrid">${field({name:"pnome",label:"Nome do produto",value:p?.nome||"",full:true})}${field({name:"psku",label:"SKU (opcional)",value:p?.sku||""})}
       ${field({name:"pcons",label:"Consumo de tecido por peça (kg)",type:"num",value:p?.consumoKg??"",ph:"Ex.: 0,176"})}
       ${field({name:"prolo",label:"Peso médio do rolo (kg)",type:"num",value:p?.kgRolo??"",ph:"Ex.: 19"})}
       ${(()=>{const t=p?statsProd(p.id):{};return field({name:"pppr",label:"Peças por rolo"+(t.pprReal?` · medido no corte: ${fmt(t.pprReal,0)}`:""),type:"num",value:p?.ppr||(t.pprReal?Math.round(t.pprReal):""),ph:"Ex.: 115"})})()}
       ${field({name:"ppreco",label:"Preço do kg do tecido (R$)",type:"num",value:p?.precoKg??"",ph:"Ex.: 30,80"})}</div>
-    <div class="row between"><h3>Ficha de custo</h3><b id="pcusto" class="num"></b></div>
-    <div id="pitens" style="display:flex;flex-direction:column;gap:8px"></div>
-    ${S.insumos.length ? `<button class="btn sm" id="padd" type="button">+ Adicionar insumo já cadastrado</button>` : ""}
-    <div class="card" style="padding:10px;gap:8px"><div class="small"><b>Novo insumo direto aqui</b> <span class="muted">(ex.: etiqueta)</span></div>
-      <div class="row" style="flex-wrap:nowrap;gap:6px"><input id="ni_nome" placeholder="Nome" style="flex:2;min-width:0"><input id="ni_val" inputmode="decimal" placeholder="Valor R$" style="flex:1;min-width:0"><input id="ni_q" inputmode="decimal" placeholder="Qtd/pç" value="1" style="flex:1;min-width:0"></div>
-      <button class="btn sm pri" id="niadd" type="button" style="align-self:flex-start">+ Cadastrar e adicionar</button></div>
+    <div class="row between"><h3>Insumos / serviços</h3><b id="pcusto" class="num"></b></div>
+    <div class="small muted">Valor pago e quantas unidades ele cobre. Ex.: etiqueta R$ 15 por 1.000 unidades = R$ 0,015 por peça.</div>
+    <div class="insrow insh small muted"><span>Nome</span><span>Valor R$</span><span>Unid.</span><span>Por peça</span><span></span></div>
+    <div id="pitens" style="display:flex;flex-direction:column;gap:6px"></div>
+    <button class="btn sm" id="padd" type="button">+ Adicionar insumo / serviço</button>
     <div class="row between">${p?`<button class="btn danger sm" id="pdel">Excluir produto</button>`:"<span></span>"}<div class="row"><button class="btn ghost" id="pcancel">Cancelar</button><button class="btn pri" id="psave">Salvar</button></div></div>`, () => {
     const draw = () => {
       $("#pitens").innerHTML = rows() || `<div class="small muted">Adicione os insumos e serviços que entram em uma peça.</div>`;
-      $("#pcusto").textContent = brl(sum(itens, it => pn(it.qtd) * (insumo(it.insumoId)?.valor||0)));
-      document.querySelectorAll("[data-ii]").forEach(s => s.onchange = e => { itens[+s.dataset.ii].insumoId = e.target.value; draw(); });
-      document.querySelectorAll("[data-iq]").forEach(s => s.onchange = e => { itens[+s.dataset.iq].qtd = pn(e.target.value); draw(); });
-      document.querySelectorAll("[data-ir]").forEach(s => s.onclick = () => { itens.splice(+s.dataset.ir,1); draw(); });
+      const tot = () => { $("#pcusto").textContent = brl(sum(itens, it => (it.valor||0)/(it.un||1))); };
+      tot();
+      const upd = (el, f) => { const ix = +el.dataset[f[0]]; const v = el.value; if (f[1] === "nome") itens[ix].nome = v; else itens[ix][f[1]] = pn(v) || (f[1] === "un" ? 1 : 0);
+        const sp = el.parentNode.querySelector("span"); if (sp) sp.textContent = brlPc((itens[ix].valor||0)/(itens[ix].un||1)) + "/pç"; tot(); };
+      document.querySelectorAll("[data-in]").forEach(el => el.oninput = () => upd(el, ["in","nome"]));
+      document.querySelectorAll("[data-iv]").forEach(el => el.oninput = () => upd(el, ["iv","valor"]));
+      document.querySelectorAll("[data-iu]").forEach(el => el.oninput = () => upd(el, ["iu","un"]));
+      document.querySelectorAll("[data-ir]").forEach(b => b.onclick = () => { itens.splice(+b.dataset.ir,1); draw(); });
     };
     draw();
-    const pa = $("#padd"); if (pa) pa.onclick = () => { itens.push({insumoId:S.insumos[0].id, qtd:1}); draw(); };
-    $("#niadd").onclick = () => {
-      const nome = $("#ni_nome").value.trim(), valor = pn($("#ni_val").value), q = pn($("#ni_q").value) || 1;
-      if (!nome){ toast("Informe o nome do insumo."); return; }
-      const ex = S.insumos.find(i => i.nome.toLowerCase() === nome.toLowerCase());
-      let iid = ex?.id;
-      if (ex && $("#ni_val").value.trim() && Math.abs(pn(ex.valor) - valor) > 0.0001){ ex.valor = valor; novosIns.push(ex); }
-      if (!ex){ iid = "i" + uid(); const ni = {id: iid, nome, tipo:"INSUMO", un:"Un", valor}; S.insumos.push(ni); novosIns.push(ni); }
-      itens.push({insumoId: iid, qtd: q}); $("#ni_nome").value = ""; $("#ni_val").value = ""; $("#ni_q").value = "1"; draw();
-    };
-    $("#pcancel").onclick = () => { novosIns.forEach(n => { const k = S.insumos.indexOf(n); if (k >= 0) S.insumos.splice(k,1); }); closeModal(); };
+    $("#padd").onclick = () => { itens.push({nome:"", valor:0, un:1}); draw(); const l = document.querySelectorAll("[data-in]"); l[l.length-1]?.focus(); };
+    $("#pcancel").onclick = closeModal;
     $("#psave").onclick = () => {
       const nome = $("#f_pnome").value.trim(); if (!nome){ toast("Informe o nome do produto."); return; }
       const id = p?.id || "p" + uid();
-      novosIns.forEach(({id: iid, ...v}) => write("insumos/"+iid, v));
+      itens = itens.filter(it => (it.nome || "").trim()).map(it => ({nome: it.nome.trim(), valor: pn(it.valor), un: pn(it.un) || 1}));
       write("produtos/"+id, {nome, sku:$("#f_psku").value.trim(), consumoKg:pn($("#f_pcons").value), kgRolo:pn($("#f_prolo").value), ppr:pn($("#f_pppr").value), precoKg:pn($("#f_ppreco").value), itens}); closeModal();
     };
     const pd = $("#pdel"); if (pd) pd.onclick = () => {
@@ -1443,7 +1445,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 62;
+const APP_V = 63;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
