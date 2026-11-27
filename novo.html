@@ -1111,9 +1111,8 @@ function linkThaty(){ return location.origin + location.pathname.replace(/[^/]*$
 function viewMais(){
   if (!ehManuel()) return viewCadastros();
   return `${viewProdutosThaty()}
-  <details class="card" ${S.cadAberto ? "open" : ""} ontoggle="S.cadAberto=this.open" style="margin-top:10px"><summary class="sumrow"><span class="lbl">⚙️ Cadastros, configurações e link da Thaty</span><span class="small gold">ver ▾</span></summary>
-  ${viewCadastros()}
-  ${adm() ? `<details class="mini"><summary>Link do app da Thaty</summary><div class="card" style="margin-top:8px"><div class="small muted">Ela só precisa instalar uma vez. Quando sair versão nova, o app dela mostra "toque para atualizar" sozinho.</div><div style="word-break:break-all;font-size:13px;margin:8px 0">${esc(linkThaty())}</div><button class="btn pri" data-copiar="${esc(linkThaty())}">Copiar link</button></div></details>` : ""}</details>`;
+  <div style="margin-top:14px"></div>
+  ${adm() ? `<details class="mini"><summary>Link do app da Thaty</summary><div class="card" style="margin-top:8px"><div class="small muted">Ela só precisa instalar uma vez. Quando sair versão nova, o app dela mostra "toque para atualizar" sozinho.</div><div style="word-break:break-all;font-size:13px;margin:8px 0">${esc(linkThaty())}</div><button class="btn pri" data-copiar="${esc(linkThaty())}">Copiar link</button></div></details>` : ""}`;
 }
 function lancForm(tipo, l, opIdDefault, extra0 = {}){
   const novo = !l;
@@ -1436,7 +1435,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 53;
+const APP_V = 54;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
