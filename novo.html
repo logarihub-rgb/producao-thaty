@@ -640,8 +640,9 @@ function statsProd(prodId){
   const comPreco = os.filter(o => pn(o.precoKg) > 0).sort((a,b) => (b.num||0)-(a.num||0))[0];
   const cst = os.flatMap(o => o.costuras || []).filter(t => pn(t.custoUn) > 0).slice(-1)[0];
   // peças por rolo medidas de verdade: só produções já cortadas (peças cortadas ÷ rolos)
-  const med = os.filter(o => !o.retalho && pn(o.rolos) > 0).map(o => { const cort = sum((o.corte||{}).entregas, e => pn(e.qtd));
-    const feito = cort > 0 && (cort >= pn(o.qtd) || (o.costuras||[]).length || o.concluida); return {q: feito ? cort : 0, r: pn(o.rolos)}; }).filter(x => x.q > 0);
+  // inclui produções de sobra/retalho (sem rolos): as peças saem dos mesmos rolos
+  const med = os.map(o => { const cort = sum((o.corte||{}).entregas, e => pn(e.qtd));
+    const feito = cort > 0 && (cort >= pn(o.qtd) || (o.costuras||[]).length || o.concluida); return {q: feito ? cort : 0, r: o.retalho ? 0 : pn(o.rolos)}; }).filter(x => x.q > 0);
   const pprReal = sum(med, x => x.r) ? sum(med, x => x.q) / sum(med, x => x.r) : 0, pprCad = pn(produto(prodId)?.ppr);
   return {n: os.length, valor, kg, qtd, rolos, rate: qtd ? valor/qtd : 0, ppr: pprReal || pprCad, pprReal, pprCad, pprFonte: pprReal ? "corte" : pprCad ? "cadastro" : "", kgRolo: rolos ? kg/rolos : pn(produto(prodId)?.kgRolo),
     precoKg: comPreco ? pn(comPreco.precoKg) : pn(produto(prodId)?.precoKg), costuraUn: cst ? pn(cst.custoUn) : pn(S.cfg.costuraUn)};
@@ -1324,7 +1325,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 39;
+const APP_V = 40;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
