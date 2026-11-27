@@ -315,7 +315,7 @@ const DEF_CFG = {extra:2.9, assessoria:1.2, corteUn:0.4, corteLocal:"THÁSSIO", 
 const VIEWS = ["inicio","producoes","financeiro","mais"];
 const COLS = ["insumos","produtos","ops","lanc","pedidos"];
 const API = window.PT_API || "";
-const S = {pin:"", user:"", ok:false, insumos:[], produtos:[], ops:[], lanc:[], pedidos:[], cfg:{...DEF_CFG}, loaded:{}, view:"inicio", opId:null, sub:"insumos", orc:{prod:"",qtd:""}, fin:{op:"aberto"}, readonly:false};
+const S = {pin:"", user:"", ok:false, insumos:[], produtos:[], ops:[], lanc:[], pedidos:[], cfg:{...DEF_CFG}, loaded:{}, view:"inicio", opId:null, sub:"insumos", orc:{prod:"",qtd:""}, fin:{op:"todas"}, readonly:false};
 const CAT_COB = ["Tecido","Corte","Costura","Assessoria","Outro"];
 const CAT_DESP = ["Modelagem","Pilotagem","Impressão de risco","Frete motoboy","Carreto","Outro"];
 
@@ -990,9 +990,9 @@ function viewFinanceiro(){
   const opIdF = fo !== "todas" && fo !== "geral" && fo !== "aberto" ? fo : "";
   const btns = adm() ? `<div class="row"><button class="btn" data-novo="recebimento">+ Pagamento</button><button class="btn" data-novo="despesa">+ Serviço</button></div>` : ed ? `<button class="btn pri" data-novo="recebimento">Comprovante de pagamento</button>` : "";
   return `<div class="row between"><h1>Extrato</h1>${btns}</div>
-  <div class="field"><label for="finop">Mostrar</label><select id="finop"><option value="aberto">Em aberto (em andamento ou com algo a pagar)</option><option value="todas" ${fo==="todas"?"selected":""}>Tudo (histórico completo)</option><option value="geral" ${fo==="geral"?"selected":""}>Serviços gerais (sem pedido)</option>${sortedOps().map(o=>`<option value="${esc(o.id)}" ${fo===o.id?"selected":""}>${opCode(o)} · ${esc(produto(o.produtoId)?.nome||"")}</option>`).join("")}</select></div>
-  <div class="card"><h2>Resumo por etapa</h2><div class="small muted">Toque numa etapa para ver cada lançamento.</div>${contaHtml(ls, opIdF)}</div>
-  ${fo === "aberto" ? "" : extratoHtml(ls)}
+  <div class="field"><label for="finop">Mostrar</label><select id="finop"><option value="todas">Tudo (histórico completo)</option><option value="aberto" ${fo==="aberto"?"selected":""}>Só pedidos em aberto</option><option value="geral" ${fo==="geral"?"selected":""}>Serviços gerais (sem pedido)</option>${sortedOps().map(o=>`<option value="${esc(o.id)}" ${fo===o.id?"selected":""}>${opCode(o)} · ${esc(produto(o.produtoId)?.nome||"")}</option>`).join("")}</select></div>
+  ${adm() ? `<details class="card"><summary class="sumrow"><span class="lbl">Resumo por etapa · registrar pagamentos</span><span class="small gold">ver ▾</span></summary>${contaHtml(ls, opIdF)}</details>` : ""}
+  ${extratoHtml(ls) || `<div class="empty">Nada lançado.</div>`}
   ${adm() && fo !== "aberto" ? `<div class="card"><h2>Pagamentos da Thaty</h2>${recs.length ? recs.map(lancRow).join("") : `<div class="small muted">Nenhum pagamento lançado.</div>`}</div>` : ""}
   ${adm() && fo === "todas" ? oficinasResumo(S.ops.map(o => ({o, k:calc(o)}))) : ""}`;
 }
@@ -1368,7 +1368,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 46;
+const APP_V = 47;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
