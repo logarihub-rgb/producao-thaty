@@ -254,6 +254,7 @@ h1{font-family:var(--font-display);font-weight:800;font-size:26px} h2{font-famil
 .how div::before{counter-increment:h;content:counter(h);width:26px;height:26px;border-radius:50%;border:1px solid var(--accent);color:var(--accent);display:grid;place-items:center;font-weight:700;font-size:13px}
 .ext{display:grid;grid-template-columns:52px 1fr auto;gap:2px 10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
 .ext:last-child{border-bottom:0}
+.ext .aloc{grid-column:1/-1;margin:6px 0 2px;padding:8px 10px;border-radius:10px;background:rgba(122,170,110,.08);border:1px solid rgba(122,170,110,.25);display:flex;flex-direction:column;gap:3px}
 .ext .d{font-size:12px;color:var(--muted)}
 .ext .v{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
 .ext .v.pg{color:var(--ok)}
@@ -292,6 +293,9 @@ details.ent>summary::before{content:none}details.ent>summary::-webkit-details-ma
 details.ent>summary .entv{color:#c9a35a;font-size:13px}details.ent>summary .entv::after{content:"ver ▾"}details.ent[open]>summary .entv::after{content:"fechar ▴"}
 .paylbl{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#c9a35a;margin:4px 0 -2px}
 .btn.big-cta2{width:100%;padding:14px;border:1.5px solid #c9a35a;background:rgba(201,163,90,.12);color:#e9cf98;font-weight:700;font-size:15px;border-radius:12px}
+html,body{overflow-x:hidden;max-width:100%}
+#who{max-width:42vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.flow .fs{min-width:0}.flow .fs b,.flow .fs small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 </style>
 </head>
 <body>
@@ -317,7 +321,7 @@ const DEF_CFG = {extra:2.9, assessoria:1.2, corteUn:0.4, corteLocal:"THÁSSIO", 
 const VIEWS = ["inicio","producoes","financeiro","mais"];
 const COLS = ["insumos","produtos","ops","lanc","pedidos"];
 const API = window.PT_API || "";
-const S = {pin:"", user:"", ok:false, insumos:[], produtos:[], ops:[], lanc:[], pedidos:[], cfg:{...DEF_CFG}, loaded:{}, view:"inicio", opId:null, sub:"insumos", orc:{prod:"",qtd:""}, fin:{op:"todas"}, readonly:false};
+const S = {pin:"", user:"", ok:false, insumos:[], produtos:[], ops:[], lanc:[], pedidos:[], cfg:{...DEF_CFG}, loaded:{}, view:"inicio", opId:null, sub:"produtos", orc:{prod:"",qtd:""}, fin:{op:"todas"}, readonly:false};
 const CAT_COB = ["Tecido","Corte","Costura","Assessoria","Outro"];
 const CAT_DESP = ["Modelagem","Pilotagem","Impressão de risco","Frete motoboy","Carreto","Outro"];
 
@@ -406,18 +410,19 @@ function finance(){
   const deb = S.lanc.filter(l => l.tipo !== "recebimento").map(l => ({...l, pago:0}))
     .sort((a,b) => (a.data||"").localeCompare(b.data||"") || (a.criadoEm||"").localeCompare(b.criadoEm||""));
   const rec = S.lanc.filter(l => l.tipo === "recebimento").sort((a,b)=>(a.data||"").localeCompare(b.data||""));
-  const apply = (list, val) => { for (const d of list){ if (val <= 0.0001) break; const f = pn(d.valor) - d.pago; if (f <= 0) continue; const x = Math.min(f, val); d.pago += x; val -= x; } return val; };
-  let sobra = 0, sobraSec = 0;
-  rec.filter(r => r.secao).forEach(r => { sobraSec += apply(deb.filter(d => (!r.opId || d.opId === r.opId) && secaoDe(d) === r.secao), pn(r.valor)); });
-  rec.filter(r => !r.secao && r.opId).forEach(r => { sobra += apply(deb.filter(d => d.opId === r.opId), pn(r.valor)); });
-  sobra += sum(rec.filter(r => !r.secao && !r.opId), r => pn(r.valor));
-  sobra = apply(deb, sobra);
+  const aloc = {};
+  const apply = (list, val, rid) => { for (const d of list){ if (val <= 0.0001) break; const f = pn(d.valor) - d.pago; if (f <= 0) continue; const x = Math.min(f, val); d.pago += x; val -= x; if (rid) (aloc[rid] ||= []).push({op: d.opId || "", sec: secaoDe(d), x}); } return val; };
+  let sobra = 0, sobraSec = 0; const resto = [];
+  rec.filter(r => r.secao).forEach(r => { sobraSec += apply(deb.filter(d => (!r.opId || d.opId === r.opId) && secaoDe(d) === r.secao), pn(r.valor), r.id); });
+  rec.filter(r => !r.secao && r.opId).forEach(r => { resto.push({id: r.id, v: apply(deb.filter(d => d.opId === r.opId), pn(r.valor), r.id)}); });
+  rec.filter(r => !r.secao && !r.opId).forEach(r => resto.push({id: r.id, v: pn(r.valor)}));
+  resto.forEach(o => { sobra += apply(deb, o.v, o.id); });
   const st = d => d.pago >= pn(d.valor) - 0.005 ? "pago" : d.pago > 0 ? "parcial" : "pendente";
   const map = {}; deb.forEach(d => map[d.id] = {pago:d.pago, st:st(d)});
   const totCob = sum(deb.filter(d=>d.tipo==="cobranca"), d=>pn(d.valor));
   const totDesp = sum(deb.filter(d=>d.tipo==="despesa"), d=>pn(d.valor));
   const totRec = sum(rec, r=>pn(r.valor));
-  return {map, totCob, totDesp, totRec, saldo: totCob + totDesp - totRec, credito: Math.max(0, sobra) + sobraSec,
+  return {map, aloc, totCob, totDesp, totRec, saldo: totCob + totDesp - totRec, credito: Math.max(0, sobra) + sobraSec,
     despAberto: sum(deb.filter(d=>d.tipo==="despesa"), d=>pn(d.valor)-d.pago), aberto: sum(deb, d=>pn(d.valor)-d.pago)};
 }
 function finOp(opId, F){
@@ -609,7 +614,7 @@ function opCard(op){
   const k = calc(op); const f = finOp(op.id, S.F); const fl = fluxo(op, k);
   return `<button class="op" data-op="${esc(op.id)}">
     <div class="row between"><div class="row" style="gap:8px"><span class="code">${opCode(op)}</span><div><b>${esc(k.prod?.nome || "Produto removido")}</b><div class="small muted">${fmt(k.qtd)} peças</div><div class="small muted">Início ${fdate(op.data)} · ${fimOp(op, k)}</div></div></div></div>
-    ${pendente(op) ? "" : `<div class="paylbl">Produção</div>`}${fl.html}${pendente(op) ? fl.next : ""}
+    ${pendente(op) ? "" : `<div class="paylbl">Produção · ${opCode(op)}</div>`}${fl.html}${pendente(op) ? fl.next : ""}
     ${pendente(op) ? "" : pagFlow(op)}
     ${pendente(op) ? `<div class="row between small"><span class="muted">Cores</span><b>${esc((op.obs||"").replace(/^Cores: /,"").split(" · ").slice(0,4).join(" · "))}</b></div>` : `<div class="row between small"><span class="muted">${f.aberto>0.005?"Falta pagar deste pedido":"Pedido pago"}</span><b class="num" style="color:${f.aberto>0.005?"var(--warn)":"var(--ok)"}">${f.aberto>0.005?brl(f.aberto):"✓"}</b></div>`}
   </button>${pendente(op) && adm() ? `<button class="btn pri" style="width:100%;margin-top:-4px" data-aceitar="${esc(op.id)}">✓ Aceitar pedido ${opCode(op)}</button>` : ""}`;
@@ -697,7 +702,7 @@ function cardPeca(op, soNome){
   return `<details class="card"><summary class="sumrow"><div><div class="lbl">${soNome ? esc(k.prod?.nome || "modelo") + " · custo por peça" : "Quanto custa cada peça · " + esc(k.prod?.nome || "modelo")}</div><div class="big gold">${brl(c.total)}</div></div><span class="small gold">ver conta ▾</span></summary>
     <div>${c.it.map(x => `<div class="ln"><span>${x.n}${x.p?`<span class="prev">previsto</span>`:""}</span><span class="v">${brl(x.v)}</span><small>${x.d}</small></div>`).join("")}
       <div class="ln tot"><span>Total por peça</span><span class="v">${brl(c.total)}</span><small>soma das etapas acima</small></div>
-      ${soNome && adm() && k.prod ? `<button class="btn sm pri" data-prod="${esc(k.prod.id)}" style="margin-top:10px">✏️ Editar produto (insumos, etiqueta, rendimento)</button>` : ""}</div>
+      ${soNome && adm() && k.prod ? `<button class="btn sm pri" data-prod="${esc(k.prod.id)}" style="margin-top:10px">✏️ Editar produto</button>` : ""}</div>
   </details>`;
 }
 const ehManuel = () => !/thaty/i.test(S.user || "");
@@ -781,7 +786,7 @@ function secsDe(opId){
 function pagFlow(op){
   const g = secsDe(op.id); const etapas = g.todas;
   const serv = S.lanc.filter(l => l.tipo !== "recebimento" && l.opId === op.id && secaoDe(l) === "Servicos");
-  return `<div class="paylbl">Pagamentos</div><div class="flow ${etapas.length > 4 ? "f5" : ""}">${etapas.map(x => { const st = x.v <= 0.005 ? "" : x.ab > 0.005 ? "now" : "done";
+  return `<div class="paylbl">Pagamentos · ${opCode(op)}</div><div class="flow ${etapas.length > 4 ? "f5" : ""}">${etapas.map(x => { const st = x.v <= 0.005 ? "" : x.ab > 0.005 ? "now" : "done";
     return `<div class="fs ${st}"><i>$</i><b>${x.nome === "Outros serviços" ? "Serviços" : x.nome}</b><small>${!st ? (x.key === "Servicos" ? "nenhum" : "a lançar") : st === "done" ? "pago ✓" : brl(x.ab)}</small></div>`; }).join("")}</div>
     ${serv.map(l => { const a = pn(l.valor) - (S.F.map[l.id]?.pago || 0); return `<div class="row between small"><span>${esc(l.desc || "Serviço")} <span class="muted">· ${opCode(op)}</span></span><span>${a > 0.005 ? brl(a) : "pago ✓"}</span></div>`; }).join("")}`;
 }
@@ -1014,13 +1019,18 @@ function contaHtml(ls, opId){
   return `<div class="conta"><div class="h"><span>Sessão</span><span class="v">Valor</span><span class="v">Em aberto</span></div>${rows}
     <div class="tot"><span>Total</span><span class="v">${brl(T)}</span><span class="v ${T-P>0.005?"ab":"zero"}">${brl(Math.max(0,T-P))}</span></div></div>`;
 }
+function alocHtml(rid){
+  const a = S.F.aloc?.[rid]; if (!a || !a.length) return "";
+  const g = {}; a.forEach(x => { const nomeSec = (SECOES.find(s => s[0] === x.sec) || [0, x.sec])[1]; const k = (x.op ? opCode(opById(x.op)) : "Geral") + " · " + (nomeSec === "Outros serviços" ? "Serviços" : nomeSec); g[k] = (g[k] || 0) + x.x; });
+  return `<div class="aloc"><div class="small muted">Este pagamento foi para:</div>${Object.entries(g).map(([k,v]) => `<div class="row between small"><span>${esc(k)}</span><span>${brl(v)}</span></div>`).join("")}</div>`;
+}
 function extratoHtml(ls){
   const ord = [...ls].sort((a,b) => (a.data||"").localeCompare(b.data||"") || (a.criadoEm||"").localeCompare(b.criadoEm||""));
   let saldo = 0; const rows = ord.map(l => { const rec = l.tipo === "recebimento"; saldo += rec ? -pn(l.valor) : pn(l.valor); return {l, rec, saldo}; }).reverse();
   if (!rows.length) return "";
   const lim = S.extTodos ? rows : rows.slice(0, 25);
   return `<div class="card"><h2>Extrato</h2><div class="small muted">Tudo o que aconteceu, do mais recente para o mais antigo. Embaixo de cada valor aparece como ficou a conta depois dele.</div><div>
-    ${lim.map(({l,rec,saldo}) => `<div class="ext"><span class="d">${fdate(l.data).slice(0,5)}</span><span><b>${rec ? "Pagamento recebido ✓" : esc(l.cat || "Serviço")}</b> <span class="small muted">· ${opCode(opById(l.opId))}</span></span><span class="v ${rec?"pg":""}">${rec?"− ":""}${brl(pn(l.valor))}</span><span class="ds">${esc(l.desc||"")}</span><span class="sl">${saldo < -0.005 ? `saldo a favor ${brl(-saldo)}` : `falta pagar ${brl(saldo)}`}</span></div>`).join("")}
+    ${lim.map(({l,rec,saldo}) => `<div class="ext"><span class="d">${fdate(l.data).slice(0,5)}</span><span><b>${rec ? "Pagamento recebido ✓" : esc(l.cat || "Serviço")}</b> <span class="small muted">· ${opCode(opById(l.opId))}</span></span><span class="v ${rec?"pg":""}">${rec?"− ":""}${brl(pn(l.valor))}</span><span class="ds">${esc(l.desc||"")}</span><span class="sl">${saldo < -0.005 ? `saldo a favor ${brl(-saldo)}` : `falta pagar ${brl(saldo)}`}</span>${rec ? alocHtml(l.id) : ""}</div>`).join("")}
   </div>${rows.length > lim.length ? `<button class="btn sm" id="extall">Ver todos (${rows.length})</button>` : ""}</div>`;
 }
 function viewFinanceiro(){
@@ -1168,7 +1178,7 @@ function viewProdutosThaty(){
   return `<div class="row between"><h1>Produtos</h1>${adm() ? `<button class="btn pri sm" id="newprod">+ Novo produto</button>` : ""}</div><div class="small muted" style="margin:-4px 0 10px">Toque em um modelo para ver a conta: tecido, corte, costura e assessoria.</div>${cards.join("") || `<div class="empty">Nenhum produto cadastrado.</div>`}`;
 }
 function viewCadastros(){
-  if (!ehManuel()) S.sub = "produtos";
+  if (!ehManuel() || S.sub === "insumos") S.sub = "produtos";
   const sub = S.sub; const ed = !S.readonly && ehManuel();
   let body = "";
   if (sub === "insumos"){
@@ -1194,7 +1204,7 @@ function viewCadastros(){
     <div class="small muted">O custo fixo por peça substitui o “+2,90” da planilha antiga no custo real.</div></div>`;
   }
   if (!ehManuel()) return viewProdutosThaty();
-  return `<h1>Cadastros</h1><div class="subtabs" id="subtabs">${[["insumos","Insumos/serviços"],["produtos","Produtos"],["config","Configurações"]].map(([v,t])=>`<button data-s="${v}" aria-pressed="${sub===v}">${t}</button>`).join("")}</div>${body}`;
+  return `<h1>Cadastros</h1><div class="subtabs" id="subtabs">${[["produtos","Produtos"],["config","Configurações"]].map(([v,t])=>`<button data-s="${v}" aria-pressed="${sub===v}">${t}</button>`).join("")}</div>${body}`;
 }
 
 /* ---------- ações ---------- */
@@ -1407,6 +1417,7 @@ function prodForm(p){
       if (!nome){ toast("Informe o nome do insumo."); return; }
       const ex = S.insumos.find(i => i.nome.toLowerCase() === nome.toLowerCase());
       let iid = ex?.id;
+      if (ex && $("#ni_val").value.trim() && Math.abs(pn(ex.valor) - valor) > 0.0001){ ex.valor = valor; novosIns.push(ex); }
       if (!ex){ iid = "i" + uid(); const ni = {id: iid, nome, tipo:"INSUMO", un:"Un", valor}; S.insumos.push(ni); novosIns.push(ni); }
       itens.push({insumoId: iid, qtd: q}); $("#ni_nome").value = ""; $("#ni_val").value = ""; $("#ni_q").value = "1"; draw();
     };
@@ -1425,7 +1436,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 52;
+const APP_V = 53;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
