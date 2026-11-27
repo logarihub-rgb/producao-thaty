@@ -699,7 +699,7 @@ function custoPeca(op, k){
   const cost = qs ? sum(k.partes, t => t.q*t.un)/qs : pn(S.cfg.costuraUn);
   const it = [
     (() => { const st = statsProd(op.produtoId); const pad = pn(produto(op.produtoId)?.tecidoPc);
-      if (pad > 0 && !adm()) return {n:"Tecido", v: pad, d:"valor do tecido por peça (com margem para variação de lote e grade)", p:false};
+      if (pad > 0){ const real = k.porItem; return {n:"Tecido", v: pad, d: `Valor alvo ${brl(pad)} · real desta produção ${real > 0 ? brl(real) + (op.retalho ? "" : ` (${brl(k.custoTecido)} ÷ ${fmt(sum((op.corte||{}).entregas, e => pn(e.qtd)) || k.qtd)} peças)`) : "ainda sem tecido"}`, p:false}; }
       return st.valor > 0
       ? {n:"Tecido", v: st.rate, d:`${brl(st.valor)} de tecido (${fmt(st.rolos)} rolos) ÷ ${fmt(st.qtd)} peças cortadas${pad > 0 ? ` · para a Thaty aparece ${brl(pad)}` : ""}`, p:false}
       : pad > 0 ? {n:"Tecido", v: pad, d:"valor padrão por peça", p:false} : {n:"Tecido", v:0, d:"ainda não comprado", p:true}; })(),
@@ -1451,7 +1451,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 65;
+const APP_V = 66;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
