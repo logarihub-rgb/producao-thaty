@@ -290,6 +290,8 @@ details.card[open] .sumrow .gold:last-child{opacity:.6}
 details.ent>summary{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border:1px solid #c9a35a;border-radius:14px;background:rgba(201,163,90,.10);color:var(--text,#eee);font-size:15px;font-weight:600;margin-top:6px}
 details.ent>summary::before{content:none}details.ent>summary::-webkit-details-marker{display:none}
 details.ent>summary .entv{color:#c9a35a;font-size:13px}details.ent>summary .entv::after{content:"ver ▾"}details.ent[open]>summary .entv::after{content:"fechar ▴"}
+.paylbl{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:2px 0 -4px}
+.btn.big-cta2{width:100%;padding:14px;border:1.5px solid #c9a35a;background:rgba(201,163,90,.12);color:#e9cf98;font-weight:700;font-size:15px;border-radius:12px}
 </style>
 </head>
 <body>
@@ -557,6 +559,7 @@ function render(){
   if (!COLS.every(c => S.loaded[c])){ m.innerHTML = `<div class="empty">Carregando dados da produção…</div>`; return; }
   S.F = finance();
   const ro = S.readonly ? `<div class="note">Você está vendo em modo leitura: sua conta não tem permissão para editar.</div>` : "";
+  if (S.view === "financeiro" && S.user && !ehManuel()) S.view = "inicio";
   const html = S.view === "inicio" ? viewInicio() : S.view === "financeiro" ? viewFinanceiro()
     : S.view === "mais" ? viewMais()
     : (S.opId ? viewOp(S.opId) : viewProducoes());
@@ -602,6 +605,7 @@ function opCard(op){
   return `<button class="op" data-op="${esc(op.id)}">
     <div class="row between"><div class="row" style="gap:8px"><span class="code">${opCode(op)}</span><div><b>${esc(k.prod?.nome || "Produto removido")}</b><div class="small muted">${fmt(k.qtd)} peças · ${fdate(op.data)}</div></div></div></div>
     ${fl.html}${fl.next}
+    ${pendente(op) ? "" : pagFlow(op)}
     ${pendente(op) ? `<div class="row between small"><span class="muted">Cores</span><b>${esc((op.obs||"").replace(/^Cores: /,"").split(" · ").slice(0,4).join(" · "))}</b></div>` : `<div class="row between small"><span class="muted">${f.aberto>0.005?"Falta pagar deste pedido":"Pedido pago"}</span><b class="num" style="color:${f.aberto>0.005?"var(--warn)":"var(--ok)"}">${f.aberto>0.005?brl(f.aberto):"✓"}</b></div>`}
   </button>${pendente(op) && adm() ? `<button class="btn pri" style="width:100%;margin-top:-4px" data-aceitar="${esc(op.id)}">✓ Aceitar pedido ${opCode(op)}</button>` : ""}`;
 }
@@ -762,6 +766,19 @@ function pedidoForm(){
     };
   });
 }
+function secsDe(opId){
+  const F = S.F; const ls = S.lanc.filter(l => l.tipo !== "recebimento" && (l.opId || "") === (opId || ""));
+  const todas = SECOES.map(([key,nome]) => { const it = ls.filter(l => secaoDe(l) === key); return {key, nome, v: sum(it, l => pn(l.valor)), ab: sum(it, l => pn(l.valor) - (F.map[l.id]?.pago || 0))}; });
+  const secs = todas.filter(x => x.ab > 0.005);
+  return {id: opId || "", todas, secs, tot: sum(secs, x => x.ab)};
+}
+function pagFlow(op){
+  const g = secsDe(op.id); const etapas = g.todas.filter(x => x.key !== "Servicos" || x.v > 0.005);
+  const serv = S.lanc.filter(l => l.tipo !== "recebimento" && l.opId === op.id && secaoDe(l) === "Servicos");
+  return `<div class="paylbl">Pagamentos</div><div class="flow ${etapas.length > 4 ? "f5" : ""}">${etapas.map(x => { const st = x.v <= 0.005 ? "" : x.ab > 0.005 ? "now" : "done";
+    return `<div class="fs ${st}"><i>$</i><b>${x.nome === "Outros serviços" ? "Outros" : x.nome}</b><small>${!st ? "a lançar" : st === "done" ? "pago ✓" : brl(x.ab)}</small></div>`; }).join("")}</div>
+    ${serv.map(l => { const a = pn(l.valor) - (S.F.map[l.id]?.pago || 0); return `<div class="row between small"><span>${esc(l.desc || "Serviço")} <span class="muted">· ${opCode(op)}</span></span><span>${a > 0.005 ? brl(a) : "pago ✓"}</span></div>`; }).join("")}`;
+}
 function pagBloco(g){
   const op = g.id ? S.ops.find(o => o.id === g.id) : null;
   if (!op){ const its = S.lanc.filter(l => l.tipo !== "recebimento" && !l.opId).map(l => ({l, ab: pn(l.valor) - (S.F.map[l.id]?.pago || 0)})).filter(x => x.ab > 0.005).sort((a,b) => (b.l.data||"").localeCompare(a.l.data||""));
@@ -789,6 +806,16 @@ function viewInicio(){
   const abV = adm() ? ab : sum(porOp, g => g.tot);
   const prods = [...new Set(all.map(o => o.produtoId))].map(pid => all.find(o => o.produtoId === pid)).filter(Boolean);
   const nome = adm() ? "Manuel" : "Thaty ✨";
+  if (!adm()){
+    const tot = sum(S.ops.filter(o => !pendente(o)), o => secsDe(o.id).tot) + secsDe("").tot;
+    return `<h1>Pagamentos</h1><div class="card hero2">
+      ${tot > 0.005 ? `<div class="lbl">Falta pagar</div><div class="big">${brl(tot)}</div>` : `<div class="lbl">Sua conta</div><div class="big" style="color:var(--ok)">Tudo pago ✓</div>`}
+      <div class="paybox"><div><span>Pix</span><b>${PIX.chave}</b><small>${PIX.banco} · ${PIX.nome}</small></div><button class="btn pri" data-copiar="${PIX.chave}">Copiar chave Pix</button></div>
+      ${!S.readonly ? `<button class="btn big-cta2" data-novo="recebimento">📎 Enviar comprovante de pagamento</button>` : ""}
+    </div>
+    ${notifBox()}
+    ${extratoHtml(S.lanc) || `<div class="empty">Nada lançado ainda.</div>`}`;
+  }
   return `<div class="welcome">Olá, <b>${nome}</b></div>
   <div class="card hero2">
     ${abV > 0.005 ? `<div class="lbl">Falta pagar</div><div class="big">${brl(abV)}</div>
@@ -816,12 +843,14 @@ function viewInicio(){
 }
 function viewProducoes(){
   const all = sortedOps().map(o => ({o, k:calc(o)}));
-  const pend = x => x.k.aberta;
+  const pend = x => x.k.aberta || finOp(x.o.id, S.F).aberto > 0.005;
   const ab = all.filter(pend), fe = all.filter(x => !pend(x));
   migrarPedidos();
+  const ger = secsDe("");
   return `<div class="row between"><h1>Pedidos</h1></div>
   ${pedidosHtml()}
   ${ab.length ? `<div class="oplist">${ab.map(x=>opCard(x.o)).join("")}</div>` : `<div class="empty">Nenhum pedido em andamento.</div>`}
+  ${ger.tot > 0.005 ? `<div class="oplist">${pagBloco(ger)}</div>` : ""}
   ${fe.length ? `<details class="mini ent"><summary><span>✓ Pedidos entregues (${fe.length})</span><span class="entv"></span></summary><div class="oplist" style="margin-top:10px">${fe.map(x=>opCard(x.o)).join("")}</div></details>` : ""}`;
 }
 function oficinasResumo(all){
@@ -1368,7 +1397,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 47;
+const APP_V = 48;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
@@ -1398,7 +1427,8 @@ function arrumaAbas(){
   const nav = $("#tabs"); if (!nav) return;
   const bi = nav.querySelector('[data-v="inicio"]'), bp = nav.querySelector('[data-v="producoes"]');
   if (!bi || !bp) return;
-  const bm = nav.querySelector('[data-v="mais"]');
+  const bm = nav.querySelector('[data-v="mais"]'), bf = nav.querySelector('[data-v="financeiro"]');
+  if (bf) bf.hidden = !ehManuel();
   if (!ehManuel()){ bi.textContent = "Pagamentos"; nav.insertBefore(bp, bi); if (bm) bm.textContent = "Produtos"; }
   else { bi.textContent = "Início"; nav.insertBefore(bi, bp); if (bm) bm.textContent = "Mais"; }
 }
