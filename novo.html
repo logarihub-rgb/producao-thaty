@@ -786,16 +786,12 @@ function viewInicio(){
       const todas = SECOES.map(([key,nome]) => { const it = ls.filter(l => secaoDe(l) === key); return {key, nome, v: sum(it, l => pn(l.valor)), ab: sum(it, l => pn(l.valor) - (F.map[l.id]?.pago || 0))}; });
       const secs = todas.filter(x => x.ab > 0.005);
       return {...g, todas, secs, tot: sum(secs, x => x.ab)}; }).filter(g => g.tot > 0.005);
-  if (!adm()){ // Thaty vê só as produções em andamento
-    const andam = new Set(all.filter(o => calc(o).aberta).map(o => o.id));
-    for (let i = porOp.length - 1; i >= 0; i--) if (porOp[i].id && !andam.has(porOp[i].id)) porOp.splice(i, 1);
-  }
   const abV = adm() ? ab : sum(porOp, g => g.tot);
   const prods = [...new Set(all.map(o => o.produtoId))].map(pid => all.find(o => o.produtoId === pid)).filter(Boolean);
   const nome = adm() ? "Manuel" : "Thaty ✨";
   return `<div class="welcome">Olá, <b>${nome}</b></div>
   <div class="card hero2">
-    ${abV > 0.005 ? `<div class="lbl">Falta pagar${adm() ? "" : " · produções em andamento"}</div><div class="big">${brl(abV)}</div>
+    ${abV > 0.005 ? `<div class="lbl">Falta pagar</div><div class="big">${brl(abV)}</div>
 ` : `<div class="lbl">Sua conta</div><div class="big" style="color:var(--ok)">Tudo pago ✓</div>`}
     ${adm() ? `<div class="ln"><span>Já foi feito</span><span class="v">${brl(feito)}</span></div>
     <div class="ln"><span>Você já pagou</span><span class="v" style="color:var(--ok)">− ${brl(F.totRec)}</span></div>
@@ -988,13 +984,13 @@ function viewFinanceiro(){
   syncPagTecido();
   const F = S.F; const ed = !S.readonly; const fo = S.fin.op;
   let ls = [...S.lanc];
-  if (fo === "aberto"){ const ab = new Set(S.ops.filter(o => calc(o).aberta).map(o => o.id)); ls = ls.filter(l => l.opId && ab.has(l.opId)); }
+  if (fo === "aberto"){ const ab = new Set(S.ops.filter(o => calc(o).aberta || finOp(o.id, F).aberto > 0.005).map(o => o.id)); ls = ls.filter(l => l.opId && ab.has(l.opId)); }
   else if (fo === "geral") ls = ls.filter(l => !l.opId); else if (fo !== "todas") ls = ls.filter(l => l.opId === fo);
   const recs = ls.filter(l => l.tipo === "recebimento").sort((a,b)=>(b.data||"").localeCompare(a.data||""));
   const opIdF = fo !== "todas" && fo !== "geral" && fo !== "aberto" ? fo : "";
   const btns = adm() ? `<div class="row"><button class="btn" data-novo="recebimento">+ Pagamento</button><button class="btn" data-novo="despesa">+ Serviço</button></div>` : ed ? `<button class="btn pri" data-novo="recebimento">Comprovante de pagamento</button>` : "";
   return `<div class="row between"><h1>Extrato</h1>${btns}</div>
-  <div class="field"><label for="finop">Mostrar</label><select id="finop"><option value="aberto">Produções em andamento (ainda não entregues)</option><option value="todas" ${fo==="todas"?"selected":""}>Tudo (histórico completo)</option><option value="geral" ${fo==="geral"?"selected":""}>Serviços gerais (sem pedido)</option>${sortedOps().map(o=>`<option value="${esc(o.id)}" ${fo===o.id?"selected":""}>${opCode(o)} · ${esc(produto(o.produtoId)?.nome||"")}</option>`).join("")}</select></div>
+  <div class="field"><label for="finop">Mostrar</label><select id="finop"><option value="aberto">Em aberto (em andamento ou com algo a pagar)</option><option value="todas" ${fo==="todas"?"selected":""}>Tudo (histórico completo)</option><option value="geral" ${fo==="geral"?"selected":""}>Serviços gerais (sem pedido)</option>${sortedOps().map(o=>`<option value="${esc(o.id)}" ${fo===o.id?"selected":""}>${opCode(o)} · ${esc(produto(o.produtoId)?.nome||"")}</option>`).join("")}</select></div>
   <div class="card"><h2>Resumo por etapa</h2><div class="small muted">Toque numa etapa para ver cada lançamento.</div>${contaHtml(ls, opIdF)}</div>
   ${fo === "aberto" ? "" : extratoHtml(ls)}
   ${adm() && fo !== "aberto" ? `<div class="card"><h2>Pagamentos da Thaty</h2>${recs.length ? recs.map(lancRow).join("") : `<div class="small muted">Nenhum pagamento lançado.</div>`}</div>` : ""}
@@ -1366,7 +1362,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 44;
+const APP_V = 45;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
