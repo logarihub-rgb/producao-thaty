@@ -278,6 +278,11 @@ details.card[open] .sumrow .gold:last-child{opacity:.6}
 .linkdel{background:none;border:0;color:var(--muted);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:4px}
 .flow.f5{grid-template-columns:repeat(5,1fr)}.flow.f5 .fs b{font-size:11px}.flow.f5 .fs small{font-size:10px}.flow.f5 .fs i{width:26px;height:26px;font-size:12px}.flow.f5 .fs:not(:last-child)::after{top:12px;left:calc(50% + 15px);right:calc(-50% + 15px)}
 .big-cta{width:100%;padding:14px!important;font-size:15px!important}
+.rtgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px;margin-top:8px}
+.rt{display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:13px;cursor:pointer;position:relative}
+.rt input{position:absolute;top:8px;right:8px;accent-color:var(--accent)}
+.rt:has(input:checked){border-color:var(--accent);background:var(--tape-soft)}
+.rt.off{opacity:.4}.rt small{font-size:10px;color:var(--muted)}.rt span{color:var(--muted);font-size:12px}
 </style>
 </head>
 <body>
@@ -839,6 +844,8 @@ function viewOp(id){
   <div><h1>${opCode(op)} · ${esc(k.prod?.nome||"Produto removido")}</h1>
     <div class="muted small">${fmt(q)} peças · início ${fdate(op.data)}${op.dataFinal?` · final ${fdate(op.dataFinal)}`:""}${op.obs?` · ${esc(op.obs)}`:""}</div></div>
   <div class="card">${fl.html}${fl.next}
+    ${adm() && !pendente(op) ? `<button class="btn" style="width:100%" data-rolostec="${esc(op.id)}">🧵 ${(op.rolosTec||[]).length ? `Rolos do app Tecido: ${op.rolosTec.length} (${fmt(sum(op.rolosTec, r => r.kg),2)} kg) · alterar` : "Escolher rolos do app Tecido"}</button>` : ""}
+    ${(op.rolosTec||[]).length ? `<div class="small muted">${Object.entries(op.rolosTec.reduce((m,r) => (m[r.cor] = (m[r.cor]||0) + 1, m), {})).map(([c,n]) => `${c} ${n}`).join(" · ")}</div>` : ""}
     ${pendente(op) ? (adm() ? `<div class="row"><button class="btn pri" style="flex:1" data-aceitar="${esc(op.id)}">✓ Aceitar pedido</button><button class="linkdel" data-recusar="${esc(op.id)}">recusar</button></div>` : !S.readonly ? `<div style="text-align:right"><button class="linkdel" data-recusar="${esc(op.id)}">cancelar este pedido</button></div>` : "") : ""}</div>
 
   <div class="card">
@@ -926,6 +933,46 @@ function viewFinanceiro(){
   ${extratoHtml(ls)}
   ${adm() ? `<div class="card"><h2>Pagamentos da Thaty</h2>${recs.length ? recs.map(lancRow).join("") : `<div class="small muted">Nenhum pagamento lançado.</div>`}</div>` : ""}
   ${adm() && fo === "todas" ? oficinasResumo(S.ops.map(o => ({o, k:calc(o)}))) : ""}`;
+}
+const TEC_API = "https://script.google.com/macros/s/AKfycbyQv3EXg8p4_41qEuMetFS5D7rf9SCjlbpyPJ3i71U3NaOEJM9qj5SaHOn49GnSwUYc/exec";
+async function tecCompras(){
+  let pin = localStorage.getItem("tec_pin");
+  if (!pin){ pin = prompt("Senha (PIN) do app Tecido:"); if (!pin) throw new Error("Sem a senha do app Tecido."); }
+  const r = await fetch(TEC_API, {method:"POST", body:JSON.stringify({pin, action:"dados", p:{force:false, ev:""}}), redirect:"follow"});
+  const j = await r.json(); if (!j || !j.ok) throw new Error(j?.erro || "Erro no app Tecido");
+  try { localStorage.setItem("tec_pin", pin); } catch(e){}
+  const d = j.data; const lista = [...(d.vendas||[]), ...((d.inv && d.inv.retiradas)||[])];
+  return lista.filter(v => /tha|tati|taty/i.test(v.cliente||"") && (v.rolos||[]).length).sort((a,b) => (b.data||"").localeCompare(a.data||""));
+}
+function rolosUsados(exceto){ const u = {}; S.ops.forEach(o => { if (o.id !== exceto) (o.rolosTec||[]).forEach(r => u[r.k] = opCode(o)); }); return u; }
+async function rolosTecForm(op){
+  let compras; toast("Buscando compras no app Tecido…");
+  try { compras = await tecCompras(); } catch(e){ toast(e.message); return; }
+  if (!compras.length){ toast("Nenhuma compra da Thaty com rolos no app Tecido."); return; }
+  const usados = rolosUsados(op.id); const sel = new Set((op.rolosTec||[]).map(r => r.k));
+  const key = (v,i) => `${v.aba}|${v.linha}|${i}`;
+  const draw = () => {
+    let kg = 0, n = 0, val = 0;
+    compras.forEach(v => (v.rolos||[]).forEach((r,i) => { if (sel.has(key(v,i))){ kg += pn(r.kg); n++; val += pn(r.kg) * pn(v.precoKg); } }));
+    $("#rtsum").innerHTML = n ? `<b>${n} rolos · ${fmt(kg,2)} kg</b><span>${brl(val)} de tecido neste pedido</span>` : `<span>Toque nos rolos usados neste pedido.</span>`;
+  };
+  modal(`<h2>Rolos do app Tecido · ${opCode(op)}</h2>
+    <div class="small muted">Marque os rolos que foram usados neste corte. O tecido do pedido passa a ser a soma deles.</div>
+    ${compras.map(v => `<div class="card" style="padding:10px"><div class="row between small"><b>Compra de ${fdate(v.data)}</b><span class="muted">${brl(pn(v.precoKg))}/kg · ${(v.rolos||[]).length} rolos</span></div>
+      <div class="rtgrid">${(v.rolos||[]).map((r,i) => { const k = key(v,i), em = usados[k]; return `<label class="rt ${em?"off":""}"><input type="checkbox" data-rt="${esc(k)}" ${sel.has(k)?"checked":""} ${em?"disabled":""}><b>${esc(r.cor)}</b><span>${fmt(pn(r.kg),2)} kg</span>${em?`<small>em ${em}</small>`:""}</label>`; }).join("")}</div></div>`).join("")}
+    <div class="calcbox" id="rtsum"></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="rtc">Cancelar</button><button class="btn pri" id="rtok">Salvar rolos</button></div>`, () => {
+    draw();
+    document.querySelectorAll("[data-rt]").forEach(c => c.onchange = () => { c.checked ? sel.add(c.dataset.rt) : sel.delete(c.dataset.rt); draw(); });
+    $("#rtc").onclick = closeModal;
+    $("#rtok").onclick = () => {
+      const rolosTec = []; let kg = 0, preco = 0;
+      compras.forEach(v => (v.rolos||[]).forEach((r,i) => { const k = key(v,i); if (sel.has(k)){ rolosTec.push({k, cor:r.cor, kg:pn(r.kg), precoKg:pn(v.precoKg), compra:v.data}); kg += pn(r.kg); preco = pn(v.precoKg); } }));
+      const novo = {...clone(op), rolosTec};
+      if (rolosTec.length){ novo.kg = r2(kg); novo.rolos = rolosTec.length; novo.precoKg = preco; novo.retalho = false; }
+      closeModal(); saveOp(novo); toast(rolosTec.length ? `${rolosTec.length} rolos (${fmt(kg,2)} kg) ligados ao ${opCode(op)} ✓` : "Rolos removidos.");
+    };
+  });
 }
 function linkThaty(){ return location.origin + location.pathname.replace(/[^/]*$/,"") + "novo.html?k=" + THATY_K + "&v=" + APP_V; }
 function viewMais(){
@@ -1082,6 +1129,7 @@ function bind(){
   const ea = $("#extall"); if (ea) ea.onclick = () => { S.extTodos = true; render(); };
   const npd = $("#novoped"); if (npd) npd.onclick = pedidoForm;
   document.querySelectorAll("[data-pedst]").forEach(b => b.onclick = e => { e.stopPropagation(); const [id, s] = b.dataset.pedst.split("|"); const p = S.pedidos.find(x => x.id === id); if (!p) return; const {id:_, ...d} = p; const go_ = () => { S.pedAberto = id; write("pedidos/" + id, {...d, status:s}); toast(s === "aceito" ? "Pedido aceito ✓" : s === "produzindo" ? "Movido para 'Já viraram produção'" : "Feito"); }; if (s === "produzindo") confirmBox("Este pedido já virou produção? Ele sai da lista e fica em 'Já viraram produção'.", go_); else go_(); });
+  document.querySelectorAll("[data-rolostec]").forEach(b => b.onclick = () => { const op = opById(b.dataset.rolostec); if (op) rolosTecForm(op); });
   document.querySelectorAll("[data-aceitar]").forEach(b => b.onclick = e => { e.stopPropagation(); const op = opById(b.dataset.aceitar); if (op) aceitarOp(op); });
   document.querySelectorAll("[data-recusar]").forEach(b => b.onclick = e => { e.stopPropagation(); const op = opById(b.dataset.recusar); if (!op) return;
     confirmBox(`${adm() ? "Recusar" : "Cancelar"} o pedido ${opCode(op)}? Ele será apagado.`, () => { write("ops/" + op.id, null); (S.pedidos||[]).filter(p => p.opId === op.id).forEach(p => write("pedidos/" + p.id, null)); go("producoes"); }); });
@@ -1231,7 +1279,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 32;
+const APP_V = 33;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
