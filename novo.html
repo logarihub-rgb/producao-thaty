@@ -1081,7 +1081,7 @@ function aceitarOp(op){
   toast(`Pedido ${opCode(op)} aceito ✓`);
 }
 function migrarPedidos(){
-  if (S._mig || !adm()) return; S._mig = true;
+  return; // desativado: todos os pedidos antigos já viraram produção
   const velhos = (S.pedidos||[]).filter(p => !p.opId && (p.cores||[]).some(c => pn(c.qtd) > 0));
   if (!velhos.length) return;
   setTimeout(() => velhos.forEach(p => { const {id} = criarOpDireta(p.produtoId, (p.cores||[]).filter(c => pn(c.qtd) > 0), p.obs, true); const {id:_, ...d} = p; write("pedidos/" + p.id, {...d, status:"produzindo", opId:id}); }), 50);
@@ -1279,7 +1279,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 33;
+const APP_V = 34;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
