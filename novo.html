@@ -276,6 +276,8 @@ details.card>summary{list-style:none}details.card>summary::-webkit-details-marke
 details.card[open] .sumrow .gold:last-child{opacity:.6}
 .welcome{font-size:15px}
 .linkdel{background:none;border:0;color:var(--muted);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:4px}
+.flow.f5{grid-template-columns:repeat(5,1fr)}.flow.f5 .fs b{font-size:11px}.flow.f5 .fs small{font-size:10px}.flow.f5 .fs i{width:26px;height:26px;font-size:12px}.flow.f5 .fs:not(:last-child)::after{top:12px;left:calc(50% + 15px);right:calc(-50% + 15px)}
+.big-cta{width:100%;padding:14px!important;font-size:15px!important}
 </style>
 </head>
 <body>
@@ -533,14 +535,21 @@ function render(){
   bind();
 }
 
+const pendente = op => !!op.solicitado && !op.aceito;
 function fluxo(op, k){
   const q = k.qtd;
+  if (pendente(op)){
+    const nomes = ["Pedido","Tecido","Corte","Costura","Entregue"];
+    const html = `<div class="flow f5">${nomes.map((n,i)=>`<div class="fs ${i===0?"now":""}"><i>${i+1}</i><b>${n}</b><small>${i===0?"solicitado":""}</small></div>`).join("")}</div>`;
+    const nx = adm() ? `Pedido novo: <b>aceite para começar</b>` : `Pedido enviado · <b>aguardando o Manuel aceitar</b>`;
+    return {html, next:`<div class="next">${nx}</div>`, cur:0};
+  }
   const done = [k.etapa[0] === 2, q && k.cortado >= q, q && k.enviado >= q, op.concluida || (q && k.costurado >= q)];
   const cur = done.findIndex(d => !d);
   const subs = [op.retalho ? "retalho" : pn(op.kg) ? fmt(pn(op.kg),0)+" kg" : "falta",
     `${fmt(k.cortado)}/${fmt(q)}`, `${fmt(k.enviado)}/${fmt(q)}`, `${fmt(k.costurado)}/${fmt(q)}`];
   const nomes = ["Tecido","Corte","Costura","Entregue"];
-  const html = `<div class="flow">${nomes.map((n,i)=>`<div class="fs ${done[i]?"done":i===cur?"now":""}"><i>${done[i]?"✓":i+1}</i><b>${n}</b><small>${subs[i]}</small></div>`).join("")}</div>`;
+  const html = `<div class="flow f5"><div class="fs done"><i>✓</i><b>Pedido</b><small>aceito</small></div>${nomes.map((n,i)=>`<div class="fs ${done[i]?"done":i===cur?"now":""}"><i>${done[i]?"✓":i+2}</i><b>${n}</b><small>${subs[i]}</small></div>`).join("")}</div>`;
   let nx, ok = false;
   const ofs = k.partes.filter(t => t.aEntregar > 0).map(t => (t.local||"oficina").toUpperCase());
   if (!adm()){
@@ -564,8 +573,8 @@ function opCard(op){
   return `<button class="op" data-op="${esc(op.id)}">
     <div class="row between"><div class="row" style="gap:8px"><span class="code">${opCode(op)}</span><div><b>${esc(k.prod?.nome || "Produto removido")}</b><div class="small muted">${fmt(k.qtd)} peças · ${fdate(op.data)}</div></div></div></div>
     ${fl.html}${fl.next}
-    <div class="row between small"><span class="muted">${f.aberto>0.005?"Falta pagar deste pedido":"Pedido pago"}</span><b class="num" style="color:${f.aberto>0.005?"var(--warn)":"var(--ok)"}">${f.aberto>0.005?brl(f.aberto):"✓"}</b></div>
-  </button>`;
+    ${pendente(op) ? `<div class="row between small"><span class="muted">Cores</span><b>${esc((op.obs||"").replace(/^Cores: /,"").split(" · ").slice(0,4).join(" · "))}</b></div>` : `<div class="row between small"><span class="muted">${f.aberto>0.005?"Falta pagar deste pedido":"Pedido pago"}</span><b class="num" style="color:${f.aberto>0.005?"var(--warn)":"var(--ok)"}">${f.aberto>0.005?brl(f.aberto):"✓"}</b></div>`}
+  </button>${pendente(op) && adm() ? `<button class="btn pri" style="width:100%;margin-top:-4px" data-aceitar="${esc(op.id)}">✓ Aceitar pedido ${opCode(op)}</button>` : ""}`;
 }
 const PIX = {chave:"logari.hub@gmail.com", banco:"Banco BTG", nome:"Manuel Alves do Carmo"};
 function pixBox(){
@@ -616,7 +625,7 @@ function heroThaty(){
   return `<div class="hero"><div><span class="lbl">Valor em aberto</span><b>${brl(ab)}</b><small class="muted">soma de tudo já feito e ainda não pago</small></div>${S.view!=="inicio"?`<button class="btn sm" data-goto="inicio">Entenda →</button>`:""}</div>`;
 }
 function statsProd(prodId){
-  const os = S.ops.filter(o => o.produtoId === prodId);
+  const os = S.ops.filter(o => o.produtoId === prodId && !pendente(o));
   const valor = sum(os, o => o.retalho ? 0 : pn(o.kg)*pn(o.precoKg)), kg = sum(os, o => o.retalho ? 0 : pn(o.kg));
   const qtd = sum(os, o => pn(o.qtd)), rolos = sum(os, o => o.retalho ? 0 : pn(o.rolos));
   const comPreco = os.filter(o => pn(o.precoKg) > 0).sort((a,b) => (b.num||0)-(a.num||0))[0];
@@ -671,15 +680,8 @@ function estHtml(e){
   </div>`;
 }
 function pedidosHtml(){
-  const todos = [...(S.pedidos||[])].sort((a,b) => (b.criadoEm||"").localeCompare(a.criadoEm||""));
-  const ps = todos.filter(p => p.status !== "produzindo"), prod = todos.filter(p => p.status === "produzindo");
-  return `<div class="card"><div class="row between"><div><div class="lbl">Novo pedido</div><div class="small muted">Monte o próximo pedido por cor e veja na hora o tecido e o custo aproximados.</div></div><button class="btn pri" id="novoped">+ Fazer pedido</button></div>
-    ${ps.map(p => { const e = estPedido(p.produtoId, p.cores||[]); return `<details class="oft" ${S.pedAberto===p.id?"open":""}><summary class="row between" style="cursor:pointer"><span><b>${esc(produto(p.produtoId)?.nome||"Modelo")}</b> · ${fmt(e.tot)} pç <span class="small muted">· ${fdate(p.data)}</span></span><span class="chip ${p.status==="aceito"?"s3":"s1"}">${p.status==="aceito"?"Aceito":"Solicitado"}</span></summary>
-      <div class="small muted">${(p.cores||[]).map(c => `${esc(c.cor)} ${fmt(pn(c.qtd))}`).join(" · ")}${p.obs?` · ${esc(p.obs)}`:""}</div>${estHtml(e)}
-      ${ehManuel() ? `<button class="btn pri" style="width:100%" data-pedok="${esc(p.id)}">✓ Aceitar e criar produção</button>` : ""}
-      ${p.status!=="aceito" || ehManuel() ? `<div style="text-align:right;margin-top:14px"><button class="linkdel" data-peddel="${esc(p.id)}">excluir este pedido</button></div>` : ""}</details>`; }).join("")}
-    ${prod.length ? `<details class="mini"><summary>Já viraram produção (${prod.length})</summary><div class="small muted" style="margin:6px 0">Cada um vira uma produção (P1, P2…) na lista abaixo.</div>${prod.map(p => { const e = estPedido(p.produtoId, p.cores||[]); return `<div class="row between small" style="padding:8px 0;border-bottom:1px solid var(--line)"><span><b>${esc(produto(p.produtoId)?.nome||"Modelo")}</b> · ${fmt(e.tot)} pç · ${fdate(p.data)}</span>${p.opId && opById(p.opId) ? `<button class="btn sm ghost" data-op="${esc(p.opId)}">Ver ${opCode(opById(p.opId))} →</button>` : ehManuel() ? `<button class="btn sm pri" data-pedok="${esc(p.id)}">Criar produção</button>` : ""}</div>`; }).join("")}</details>` : ""}
-  </div>`;
+  if (S.readonly) return "";
+  return `<button class="btn pri big-cta" id="novoped">+ Fazer novo pedido</button>`;
 }
 function pedidoForm(){
   if (!S.produtos.length){ toast("Nenhum modelo cadastrado."); return; }
@@ -697,7 +699,7 @@ function pedidoForm(){
     <button class="btn sm" id="pedadd">+ Outra cor</button>
     <div id="pedest"></div>
     <div class="field"><label for="pedobs">Observação (opcional)</label><input id="pedobs" placeholder="Prazo, detalhe de tamanho…"></div>
-    <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="pedcanc">Cancelar</button><button class="btn pri" id="pedok">${adm() ? "Criar produção" : "Enviar pedido"}</button></div>`, () => {
+    <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="pedcanc">Cancelar</button><button class="btn pri" id="pedok">${adm() ? "Lançar pedido" : "Enviar pedido"}</button></div>`, () => {
     draw();
     $("#pedprod").onchange = e => { st.prod = e.target.value; draw(); };
     $("#pedadd").onclick = () => { st.cores.push({cor:"",qtd:""}); draw(); };
@@ -706,9 +708,11 @@ function pedidoForm(){
       const cores = st.cores.filter(c => pn(c.qtd) > 0).map(c => ({cor:(c.cor||"").trim() || "Sem cor", qtd:pn(c.qtd)}));
       if (!cores.length){ toast("Coloque a quantidade de pelo menos uma cor."); return; }
       const obs = $("#pedobs").value.trim();
-      if (adm()){ closeModal(); const {id, num} = criarOpDireta(st.prod, cores, obs); toast(`Produção P${num} criada ✓`); go("producoes", id); return; }
-      write("pedidos/" + uid(), {produtoId:st.prod, cores, obs, data:today(), status:"solicitado", por:S.user, criadoEm:new Date().toISOString()});
-      closeModal(); toast("Pedido enviado ao Manuel ✨");
+      closeModal();
+      if (adm()){ const {id, num} = criarOpDireta(st.prod, cores, obs); toast(`Pedido P${num} lançado ✓`); go("producoes", id); return; }
+      const {id, num} = criarOpDireta(st.prod, cores, obs, true);
+      write("pedidos/" + uid(), {produtoId:st.prod, cores, obs, data:today(), status:"produzindo", opId:id, por:S.user, criadoEm:new Date().toISOString()});
+      toast(`Pedido P${num} enviado ao Manuel ✨`); go("producoes");
     };
   });
 }
@@ -749,7 +753,8 @@ function viewProducoes(){
   const all = sortedOps().map(o => ({o, k:calc(o)}));
   const pend = x => x.k.aberta;
   const ab = all.filter(pend), fe = all.filter(x => !pend(x));
-  return `<div class="row between"><h1>Pedidos</h1>${S.readonly || !ehManuel() ? "" : `<button class="btn" id="newop">+ Nova produção</button>`}</div>
+  migrarPedidos();
+  return `<div class="row between"><h1>Pedidos</h1></div>
   ${pedidosHtml()}
   ${ab.length ? `<div class="oplist">${ab.map(x=>opCard(x.o)).join("")}</div>` : `<div class="empty">Nenhum pedido em andamento.</div>`}
   ${fe.length ? `<details class="mini"><summary>Entregues (${fe.length})</summary><div class="oplist" style="margin-top:10px">${fe.map(x=>opCard(x.o)).join("")}</div></details>` : ""}`;
@@ -833,7 +838,8 @@ function viewOp(id){
   return `<div class="row"><button class="btn ghost" data-back>← Pedidos</button></div>
   <div><h1>${opCode(op)} · ${esc(k.prod?.nome||"Produto removido")}</h1>
     <div class="muted small">${fmt(q)} peças · início ${fdate(op.data)}${op.dataFinal?` · final ${fdate(op.dataFinal)}`:""}${op.obs?` · ${esc(op.obs)}`:""}</div></div>
-  <div class="card">${fl.html}${fl.next}</div>
+  <div class="card">${fl.html}${fl.next}
+    ${pendente(op) ? (adm() ? `<div class="row"><button class="btn pri" style="flex:1" data-aceitar="${esc(op.id)}">✓ Aceitar pedido</button><button class="linkdel" data-recusar="${esc(op.id)}">recusar</button></div>` : !S.readonly ? `<div style="text-align:right"><button class="linkdel" data-recusar="${esc(op.id)}">cancelar este pedido</button></div>` : "") : ""}</div>
 
   <div class="card">
     <div class="step ${cls(0)}"><i>${num(0)}</i><div><h2>Tecido</h2>
@@ -1011,13 +1017,25 @@ function viewCadastros(){
 /* ---------- ações ---------- */
 const locais = () => { const s = new Set([S.cfg.corteLocal]); S.ops.forEach(o => { if (o.corte?.local) s.add(o.corte.local); (o.costuras||[]).forEach(t => t.local && s.add(t.local)); }); return [...s].filter(Boolean); };
 
-function criarOpDireta(produtoId, cores, obsExtra){
+function criarOpDireta(produtoId, cores, obsExtra, pend){
   const qtd = sum(cores, c => pn(c.qtd)); const p = produto(produtoId); const tn = tecidoNecessario(p, qtd);
   const num = Math.max(0, ...S.ops.map(o => o.num||0)) + 1; const id = "op" + uid();
   const obs = "Cores: " + cores.map(c => `${c.cor} ${fmt(pn(c.qtd))}`).join(" · ") + (obsExtra ? " · " + obsExtra : "");
-  saveOp({id, num, produtoId, data: today(), qtd, kg: r2(tn.kg||0) || "", precoKg: tn.preco || "", rolos: tn.rolos || "", sku:"", retalho:false, obs,
+  const tec = pend ? {kg:"", precoKg:"", rolos:""} : {kg: r2(tn.kg||0) || "", precoKg: tn.preco || "", rolos: tn.rolos || ""};
+  saveOp({id, num, produtoId, data: today(), qtd, ...tec, sku:"", retalho:false, obs, cores, solicitado: !!pend, aceito: !pend, por: S.user,
     corte:{local:S.cfg.corteLocal, custoUn:S.cfg.corteUn, entregas:[], pagamentos:[]}, costuras:[], entregasCliente:[], concluida:false, criadoEm:new Date().toISOString()});
   return {id, num};
+}
+function aceitarOp(op){
+  const p = produto(op.produtoId); const tn = tecidoNecessario(p, pn(op.qtd));
+  saveOp({...clone(op), aceito:true, aceitoEm:new Date().toISOString(), kg: pn(op.kg) || r2(tn.kg||0) || "", precoKg: pn(op.precoKg) || tn.preco || "", rolos: pn(op.rolos) || tn.rolos || ""});
+  toast(`Pedido ${opCode(op)} aceito ✓`);
+}
+function migrarPedidos(){
+  if (S._mig || !adm()) return; S._mig = true;
+  const velhos = (S.pedidos||[]).filter(p => !p.opId && (p.cores||[]).some(c => pn(c.qtd) > 0));
+  if (!velhos.length) return;
+  setTimeout(() => velhos.forEach(p => { const {id} = criarOpDireta(p.produtoId, (p.cores||[]).filter(c => pn(c.qtd) > 0), p.obs, true); const {id:_, ...d} = p; write("pedidos/" + p.id, {...d, status:"produzindo", opId:id}); }), 50);
 }
 function aceitarPedido(p){
   const cores = (p.cores||[]).filter(c => pn(c.qtd) > 0); if (!cores.length) return;
@@ -1062,6 +1080,9 @@ function bind(){
   const ea = $("#extall"); if (ea) ea.onclick = () => { S.extTodos = true; render(); };
   const npd = $("#novoped"); if (npd) npd.onclick = pedidoForm;
   document.querySelectorAll("[data-pedst]").forEach(b => b.onclick = e => { e.stopPropagation(); const [id, s] = b.dataset.pedst.split("|"); const p = S.pedidos.find(x => x.id === id); if (!p) return; const {id:_, ...d} = p; const go_ = () => { S.pedAberto = id; write("pedidos/" + id, {...d, status:s}); toast(s === "aceito" ? "Pedido aceito ✓" : s === "produzindo" ? "Movido para 'Já viraram produção'" : "Feito"); }; if (s === "produzindo") confirmBox("Este pedido já virou produção? Ele sai da lista e fica em 'Já viraram produção'.", go_); else go_(); });
+  document.querySelectorAll("[data-aceitar]").forEach(b => b.onclick = e => { e.stopPropagation(); const op = opById(b.dataset.aceitar); if (op) aceitarOp(op); });
+  document.querySelectorAll("[data-recusar]").forEach(b => b.onclick = e => { e.stopPropagation(); const op = opById(b.dataset.recusar); if (!op) return;
+    confirmBox(`${adm() ? "Recusar" : "Cancelar"} o pedido ${opCode(op)}? Ele será apagado.`, () => { write("ops/" + op.id, null); (S.pedidos||[]).filter(p => p.opId === op.id).forEach(p => write("pedidos/" + p.id, null)); go("producoes"); }); });
   document.querySelectorAll("[data-pedok]").forEach(b => b.onclick = e => { e.stopPropagation(); const p = S.pedidos.find(x => x.id === b.dataset.pedok); if (!p) return;
     const n = Math.max(0, ...S.ops.map(o => o.num||0)) + 1;
     confirmBox(`Aceitar e criar a produção P${n} com ${fmt(sum(p.cores||[], c => pn(c.qtd)))} peças?`, () => aceitarPedido(p)); });
