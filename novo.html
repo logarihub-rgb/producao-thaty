@@ -283,6 +283,8 @@ details.card[open] .sumrow .gold:last-child{opacity:.6}
 .rt input{position:absolute;top:8px;right:8px;accent-color:var(--accent)}
 .rt:has(input:checked){border-color:var(--accent);background:var(--tape-soft)}
 .rt.off{opacity:.4}.rt small{font-size:10px;color:var(--muted)}.rt span{color:var(--muted);font-size:12px}
+.sl input[type=range]{width:100%;accent-color:var(--accent);height:28px}
+.sl{border-bottom:1px solid var(--line);padding-bottom:8px}
 </style>
 </head>
 <body>
@@ -688,30 +690,42 @@ function pedidosHtml(){
   if (S.readonly) return "";
   return `<button class="btn pri big-cta" id="novoped">+ Fazer novo pedido</button>`;
 }
+function pprModelo(prod){
+  const st = statsProd(prod); if (st.ppr) return {ppr: st.ppr, est:false};
+  const os = S.ops.filter(o => !pendente(o) && !o.retalho && pn(o.rolos) > 0);
+  const q = sum(os, o => pn(o.qtd)), r = sum(os, o => pn(o.rolos));
+  return {ppr: r ? q / r : 115, est:true};
+}
 function pedidoForm(){
   if (!S.produtos.length){ toast("Nenhum modelo cadastrado."); return; }
-  const st = {prod: S.produtos[0].id, cores:[{cor:"",qtd:""},{cor:"",qtd:""}], obs:""};
+  const CORES = ["Preto","Off","Marrom","Rubi"];
+  const st = {prod: S.produtos[0].id, rolos: Object.fromEntries(CORES.map(c => [c, 0])), extras: []};
+  const lista = () => [...CORES, ...st.extras];
+  const coresSel = () => { const {ppr} = pprModelo(st.prod); return lista().filter(c => st.rolos[c] > 0).map(c => ({cor:c, rolos:st.rolos[c], qtd:Math.round(st.rolos[c] * ppr)})); };
+  const resumo = () => {
+    const {ppr, est} = pprModelo(st.prod); const cs = coresSel();
+    $("#pedest").innerHTML = (cs.length ? "" : `<div class="small muted">Arraste a bolinha de cada cor para escolher quantos rolos.</div>`) + estHtml(estPedido(st.prod, cs)) + `<div class="small muted" style="margin-top:4px">Cada rolo rende cerca de <b>${fmt(ppr,0)} peças</b>${est ? " (média geral, este modelo ainda não teve produção)" : " neste modelo"}.</div>`;
+    lista().forEach(c => { const el = document.querySelector(`[data-pc="${CSS.escape(c)}"]`); if (el) el.textContent = st.rolos[c] ? `${st.rolos[c]} rolo${st.rolos[c]>1?"s":""} · ≈ ${fmt(Math.round(st.rolos[c]*ppr))} pç` : "0"; });
+  };
   const draw = () => {
-    const e = estPedido(st.prod, st.cores);
-    $("#pedrows").innerHTML = st.cores.map((c,i) => `<div class="corrow"><div class="field"><label>Cor</label><input data-ci="${i}" data-k="cor" value="${esc(c.cor)}" placeholder="Ex.: Preto"></div><div class="field"><label>Peças</label><input data-ci="${i}" data-k="qtd" inputmode="numeric" value="${esc(c.qtd)}" placeholder="500"></div><button class="btn sm ghost" data-crm="${i}" aria-label="Remover cor">✕</button></div>`).join("");
-    $("#pedest").innerHTML = estHtml(e);
-    document.querySelectorAll("#pedrows input").forEach(inp => inp.oninput = () => { st.cores[+inp.dataset.ci][inp.dataset.k] = inp.value; $("#pedest").innerHTML = estHtml(estPedido(st.prod, st.cores)); });
-    document.querySelectorAll("[data-crm]").forEach(b => b.onclick = () => { st.cores.splice(+b.dataset.crm,1); if (!st.cores.length) st.cores.push({cor:"",qtd:""}); draw(); });
+    $("#pedrows").innerHTML = lista().map(c => `<div class="sl"><div class="row between"><b>${esc(c)}</b><span class="gold small" data-pc="${esc(c)}"></span></div><input type="range" min="0" max="12" step="1" value="${st.rolos[c]||0}" data-cr="${esc(c)}" aria-label="Rolos de ${esc(c)}"></div>`).join("");
+    document.querySelectorAll("[data-cr]").forEach(r => r.oninput = () => { st.rolos[r.dataset.cr] = +r.value; resumo(); });
+    resumo();
   };
   modal(`<h2>Fazer pedido</h2>
     <div class="field"><label for="pedprod">Modelo</label><select id="pedprod">${S.produtos.map(p => `<option value="${esc(p.id)}">${esc(p.nome)}</option>`).join("")}</select></div>
-    <div id="pedrows" style="display:flex;flex-direction:column;gap:8px"></div>
-    <button class="btn sm" id="pedadd">+ Outra cor</button>
+    <div id="pedrows" style="display:flex;flex-direction:column;gap:14px"></div>
+    <button class="btn sm ghost" id="pedadd">+ Outra cor</button>
     <div id="pedest"></div>
-    <div class="field"><label for="pedobs">Observação (opcional)</label><input id="pedobs" placeholder="Prazo, detalhe de tamanho…"></div>
+    <div class="field"><label for="pedobs">Observação (opcional)</label><input id="pedobs" placeholder="Prazo, tamanho…"></div>
     <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="pedcanc">Cancelar</button><button class="btn pri" id="pedok">${adm() ? "Lançar pedido" : "Enviar pedido"}</button></div>`, () => {
     draw();
-    $("#pedprod").onchange = e => { st.prod = e.target.value; draw(); };
-    $("#pedadd").onclick = () => { st.cores.push({cor:"",qtd:""}); draw(); };
+    $("#pedprod").onchange = e => { st.prod = e.target.value; resumo(); };
+    $("#pedadd").onclick = () => { const c = (prompt("Nome da cor:") || "").trim(); if (!c || lista().includes(c)) return; st.extras.push(c); st.rolos[c] = 1; draw(); };
     $("#pedcanc").onclick = closeModal;
     $("#pedok").onclick = () => {
-      const cores = st.cores.filter(c => pn(c.qtd) > 0).map(c => ({cor:(c.cor||"").trim() || "Sem cor", qtd:pn(c.qtd)}));
-      if (!cores.length){ toast("Coloque a quantidade de pelo menos uma cor."); return; }
+      const cores = coresSel();
+      if (!cores.length){ toast("Escolha os rolos de pelo menos uma cor."); return; }
       const obs = $("#pedobs").value.trim();
       closeModal();
       if (adm()){ const {id, num} = criarOpDireta(st.prod, cores, obs); toast(`Pedido P${num} lançado ✓`); go("producoes", id); return; }
@@ -743,10 +757,10 @@ function viewInicio(){
   </div>
   ${sec.length ? `<details class="card"><summary class="sumrow"><span class="lbl">O que falta pagar</span><span class="small gold">ver ▾</span></summary><div>${sec.map(x => `<div class="ln"><span>${x.nome}</span><span class="v">${brl(x.ab)}</span></div>`).join("")}</div><button class="btn sm" data-goto="financeiro">Ver extrato completo →</button></details>` : ""}
   ${notifBox()}
-  <div class="row between"><h2>Seus pedidos</h2>${all.length > pend.length ? `<button class="btn ghost sm" data-goto="producoes">Ver todos</button>` : ""}</div>
-  ${pend.length ? `<div class="oplist">${pend.map(opCard).join("")}</div>` : `<div class="empty">Nenhum pedido em andamento.</div>`}
+  ${!adm() ? "" : `<div class="row between"><h2>Seus pedidos</h2>${all.length > pend.length ? `<button class="btn ghost sm" data-goto="producoes">Ver todos</button>` : ""}</div>
+  ${pend.length ? `<div class="oplist">${pend.map(opCard).join("")}</div>` : `<div class="empty">Nenhum pedido em andamento.</div>`}`}
   ${prods.map(cardPeca).join("")}
-  ${pedidosHtml()}
+  ${adm() ? pedidosHtml() : ""}
   <details class="card"><summary class="sumrow"><span class="lbl">Como funciona a cobrança</span><span class="small gold">ver ▾</span></summary><div class="how">
     <div><span><b>Tecido</b>: cobrado quando o tecido é comprado, pelo peso (kg × preço do kg).</span></div>
     <div><span><b>Corte</b>: cobrado a cada lote de peças cortadas (peças × valor do corte).</span></div>
@@ -1089,7 +1103,7 @@ const locais = () => { const s = new Set([S.cfg.corteLocal]); S.ops.forEach(o =>
 function criarOpDireta(produtoId, cores, obsExtra, pend){
   const qtd = sum(cores, c => pn(c.qtd)); const p = produto(produtoId); const tn = tecidoNecessario(p, qtd);
   const num = Math.max(0, ...S.ops.map(o => o.num||0)) + 1; const id = "op" + uid();
-  const obs = "Cores: " + cores.map(c => `${c.cor} ${fmt(pn(c.qtd))}`).join(" · ") + (obsExtra ? " · " + obsExtra : "");
+  const obs = "Cores: " + cores.map(c => c.rolos ? `${c.cor} ${c.rolos} rolo${c.rolos>1?"s":""}` : `${c.cor} ${fmt(pn(c.qtd))}`).join(" · ") + (obsExtra ? " · " + obsExtra : "");
   const tec = pend ? {kg:"", precoKg:"", rolos:""} : {kg: r2(tn.kg||0) || "", precoKg: tn.preco || "", rolos: tn.rolos || ""};
   saveOp({id, num, produtoId, data: today(), qtd, ...tec, sku:"", retalho:false, obs, cores, solicitado: !!pend, aceito: !pend, por: S.user,
     corte:{local:S.cfg.corteLocal, custoUn:S.cfg.corteUn, entregas:[], pagamentos:[]}, costuras:[], entregasCliente:[], concluida:false, criadoEm:new Date().toISOString()});
@@ -1299,7 +1313,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 35;
+const APP_V = 36;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
@@ -1324,8 +1338,16 @@ function bindLogin(){
   $("#pinbox").style.display = "none";
   $("#entrar").onclick = () => go_($("#pin").value.trim(), $("#entrar")); $("#pin").onkeydown = e => { if (e.key === "Enter") go_($("#pin").value.trim(), $("#entrar")); };
 }
-function sair(){ caches.delete("pt-auth").catch(()=>{}); S.pushAtivo = false; store.set("pt_pin", null); store.set("pt_user", null); store.set("ptn_cache", null); S.ok = false; S.pin = ""; S.user = ""; COLS.forEach(c => S.loaded[c] = false); $("#who").hidden = true; render(); }
+function sair(){ S._abriu = false; caches.delete("pt-auth").catch(()=>{}); S.pushAtivo = false; store.set("pt_pin", null); store.set("pt_user", null); store.set("ptn_cache", null); S.ok = false; S.pin = ""; S.user = ""; COLS.forEach(c => S.loaded[c] = false); $("#who").hidden = true; render(); }
+function arrumaAbas(){
+  const nav = $("#tabs"); if (!nav) return;
+  const bi = nav.querySelector('[data-v="inicio"]'), bp = nav.querySelector('[data-v="producoes"]');
+  if (!bi || !bp) return;
+  if (!ehManuel()){ bi.textContent = "Pagamentos"; nav.insertBefore(bp, bi); }
+  else { bi.textContent = "Início"; nav.insertBefore(bi, bp); }
+}
 function entrou(){
+  arrumaAbas(); if (!ehManuel() && !S._abriu){ S.view = "producoes"; S.opId = null; } S._abriu = true;
   const w = $("#who"); w.hidden = false; w.textContent = S.user + " · trocar"; w.onclick = () => sair();
   render(); carregar(); checarPush();
   clearInterval(S.poll); S.poll = setInterval(checar, 25000);
