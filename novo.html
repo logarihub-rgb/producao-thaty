@@ -275,6 +275,7 @@ details.card>summary{list-style:none}details.card>summary::-webkit-details-marke
 .sumrow{display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer}
 details.card[open] .sumrow .gold:last-child{opacity:.6}
 .welcome{font-size:15px}
+.linkdel{background:none;border:0;color:var(--muted);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;padding:4px}
 </style>
 </head>
 <body>
@@ -675,7 +676,8 @@ function pedidosHtml(){
   return `<div class="card"><div class="row between"><div><div class="lbl">Novo pedido</div><div class="small muted">Monte o próximo pedido por cor e veja na hora o tecido e o custo aproximados.</div></div><button class="btn pri" id="novoped">+ Fazer pedido</button></div>
     ${ps.map(p => { const e = estPedido(p.produtoId, p.cores||[]); return `<details class="oft" ${S.pedAberto===p.id?"open":""}><summary class="row between" style="cursor:pointer"><span><b>${esc(produto(p.produtoId)?.nome||"Modelo")}</b> · ${fmt(e.tot)} pç <span class="small muted">· ${fdate(p.data)}</span></span><span class="chip ${p.status==="aceito"?"s3":"s1"}">${p.status==="aceito"?"Aceito":"Solicitado"}</span></summary>
       <div class="small muted">${(p.cores||[]).map(c => `${esc(c.cor)} ${fmt(pn(c.qtd))}`).join(" · ")}${p.obs?` · ${esc(p.obs)}`:""}</div>${estHtml(e)}
-      <div class="row">${ehManuel() ? `<button class="btn sm pri" data-pedok="${esc(p.id)}">Aceitar e criar produção</button>` : ""}${p.status!=="aceito" || ehManuel() ? `<button class="btn sm ghost danger" data-peddel="${esc(p.id)}">Excluir</button>` : ""}</div></details>`; }).join("")}
+      ${ehManuel() ? `<button class="btn pri" style="width:100%" data-pedok="${esc(p.id)}">✓ Aceitar e criar produção</button>` : ""}
+      ${p.status!=="aceito" || ehManuel() ? `<div style="text-align:right;margin-top:14px"><button class="linkdel" data-peddel="${esc(p.id)}">excluir este pedido</button></div>` : ""}</details>`; }).join("")}
     ${prod.length ? `<details class="mini"><summary>Já viraram produção (${prod.length})</summary><div class="small muted" style="margin:6px 0">Cada um vira uma produção (P1, P2…) na lista abaixo.</div>${prod.map(p => { const e = estPedido(p.produtoId, p.cores||[]); return `<div class="row between small" style="padding:8px 0;border-bottom:1px solid var(--line)"><span><b>${esc(produto(p.produtoId)?.nome||"Modelo")}</b> · ${fmt(e.tot)} pç · ${fdate(p.data)}</span>${p.opId && opById(p.opId) ? `<button class="btn sm ghost" data-op="${esc(p.opId)}">Ver ${opCode(opById(p.opId))} →</button>` : ehManuel() ? `<button class="btn sm pri" data-pedok="${esc(p.id)}">Criar produção</button>` : ""}</div>`; }).join("")}</details>` : ""}
   </div>`;
 }
