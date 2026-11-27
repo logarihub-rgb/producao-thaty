@@ -786,10 +786,10 @@ function secsDe(opId){
 function pagFlow(op){
   const g = secsDe(op.id);
   // serviços gerais (sem pedido) lançados depois que o pedido começou também valem para ele
-  // o valor de cada serviço geral é dividido igualmente entre os pedidos a que ele se refere
-  const ger = S.lanc.filter(l => l.tipo !== "recebimento" && !l.opId && (l.data || "") >= (op.data || ""));
-  const nOps = l => Math.max(1, S.ops.filter(o => !pendente(o) && (o.data || "") <= (l.data || "")).length);
-  const gv = sum(ger, l => pn(l.valor) / nOps(l)), gab = sum(ger, l => (pn(l.valor) - (S.F.map[l.id]?.pago || 0)) / nOps(l));
+  // cada serviço geral aparece inteiro num pedido só: o último que já tinha começado na data do serviço
+  const donoGer = l => S.ops.filter(o => !pendente(o) && (o.data || "") <= (l.data || "")).sort((a,b) => (a.data||"").localeCompare(b.data||"") || a.num - b.num).pop();
+  const ger = S.lanc.filter(l => l.tipo !== "recebimento" && !l.opId && donoGer(l)?.id === op.id);
+  const gv = sum(ger, l => pn(l.valor)), gab = sum(ger, l => pn(l.valor) - (S.F.map[l.id]?.pago || 0));
   const etapas = g.todas.map(x => x.key === "Servicos" ? {...x, v: x.v + gv, ab: x.ab + gab, ger: gv > 0.005} : x);
   const serv = S.lanc.filter(l => l.tipo !== "recebimento" && l.opId === op.id && secaoDe(l) === "Servicos");
   return `<div class="paylbl">Pagamentos · ${opCode(op)}</div><div class="flow ${etapas.length > 4 ? "f5" : ""}">${etapas.map(x => { const ret = x.key === "Tecido" && op.retalho && x.v <= 0.005; const st = ret ? "done" : x.v <= 0.005 ? "" : x.ab > 0.005 ? "now" : "done";
@@ -1441,7 +1441,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 57;
+const APP_V = 58;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
