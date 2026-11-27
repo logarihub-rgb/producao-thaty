@@ -639,7 +639,11 @@ function statsProd(prodId){
   const qtd = sum(os, o => pn(o.qtd)), rolos = sum(os, o => o.retalho ? 0 : pn(o.rolos));
   const comPreco = os.filter(o => pn(o.precoKg) > 0).sort((a,b) => (b.num||0)-(a.num||0))[0];
   const cst = os.flatMap(o => o.costuras || []).filter(t => pn(t.custoUn) > 0).slice(-1)[0];
-  return {n: os.length, valor, kg, qtd, rolos, rate: qtd ? valor/qtd : 0, ppr: rolos && qtd ? qtd/rolos : 0, kgRolo: rolos ? kg/rolos : pn(produto(prodId)?.kgRolo),
+  // peças por rolo medidas de verdade: só produções já cortadas (peças cortadas ÷ rolos)
+  const med = os.filter(o => !o.retalho && pn(o.rolos) > 0).map(o => { const cort = sum((o.corte||{}).entregas, e => pn(e.qtd));
+    const feito = cort > 0 && (cort >= pn(o.qtd) || (o.costuras||[]).length || o.concluida); return {q: feito ? cort : 0, r: pn(o.rolos)}; }).filter(x => x.q > 0);
+  const pprReal = sum(med, x => x.r) ? sum(med, x => x.q) / sum(med, x => x.r) : 0, pprCad = pn(produto(prodId)?.ppr);
+  return {n: os.length, valor, kg, qtd, rolos, rate: qtd ? valor/qtd : 0, ppr: pprReal || pprCad, pprReal, pprCad, pprFonte: pprReal ? "corte" : pprCad ? "cadastro" : "", kgRolo: rolos ? kg/rolos : pn(produto(prodId)?.kgRolo),
     precoKg: comPreco ? pn(comPreco.precoKg) : pn(produto(prodId)?.precoKg), costuraUn: cst ? pn(cst.custoUn) : pn(S.cfg.costuraUn)};
 }
 function custoPeca(op, k){
@@ -679,7 +683,7 @@ function estHtml(e){
   if (!e.tot) return `<div class="small muted">Preencha as quantidades para ver a estimativa.</div>`;
   if (!e.temBase) return `<div class="est"><b>${fmt(e.tot)} peças</b><span class="small muted">Ainda não temos produção deste modelo para medir quantas peças saem por rolo. O Manuel calcula o tecido e te passa.</span><span>Costura prevista: <b>${brl(e.costura)}</b> (${fmt(e.tot)} × ${brl(e.st.costuraUn)})</span></div>`;
   return `<div class="est">
-    <span class="hint">Rende cerca de ${fmt(e.st.ppr,0)} peças por rolo (medido nas produções anteriores). Cada cor varia um pouco.</span>
+    <span class="hint">Rende cerca de ${fmt(e.st.ppr,0)} peças por rolo (${e.st.pprFonte === "corte" ? "medido nos cortes" : "do cadastro"}). Cada cor varia um pouco.</span>
     ${e.linhas.map(l => `<div class="row between small"><span>${esc(l.cor||"Cor")} · ${fmt(l.q)} pç</span><b>${l.rolos} rolo${l.rolos>1?"s":""}</b></div>`).join("")}
     <div class="ln"><span>Tecido aprox.</span><span class="v">${brl(e.tecido)}</span><small>${e.rolos} rolos ≈ ${fmt(e.kg,0)} kg × ${brl(e.st.precoKg)}</small></div>
     <div class="ln"><span>Corte</span><span class="v">${brl(e.corte)}</span><small>${fmt(e.tot)} × ${brl(pn(S.cfg.corteUn))}</small></div>
@@ -693,7 +697,7 @@ function pedidosHtml(){
   return `<button class="btn pri big-cta" id="novoped">+ Fazer novo pedido</button>`;
 }
 function pprModelo(prod){
-  const st = statsProd(prod); if (st.ppr) return {ppr: st.ppr, est:false};
+  const st = statsProd(prod); if (st.ppr) return {ppr: st.ppr, est:false, fonte: st.pprFonte};
   const os = S.ops.filter(o => !pendente(o) && !o.retalho && pn(o.rolos) > 0);
   const q = sum(os, o => pn(o.qtd)), r = sum(os, o => pn(o.rolos));
   return {ppr: r ? q / r : 115, est:true};
@@ -706,7 +710,7 @@ function pedidoForm(){
   const coresSel = () => { const {ppr} = pprModelo(st.prod); return lista().filter(c => st.rolos[c] > 0).map(c => ({cor:c, rolos:st.rolos[c], qtd:Math.round(st.rolos[c] * ppr)})); };
   const resumo = () => {
     const {ppr, est} = pprModelo(st.prod); const cs = coresSel();
-    $("#pedest").innerHTML = (cs.length ? "" : `<div class="small muted">Arraste a bolinha de cada cor para escolher quantos rolos.</div>`) + estHtml(estPedido(st.prod, cs)) + `<div class="small muted" style="margin-top:4px">Cada rolo rende cerca de <b>${fmt(ppr,0)} peças</b>${est ? " (média geral, este modelo ainda não teve produção)" : " neste modelo"}.</div>`;
+    $("#pedest").innerHTML = (cs.length ? "" : `<div class="small muted">Arraste a bolinha de cada cor para escolher quantos rolos.</div>`) + estHtml(estPedido(st.prod, cs)) + `<div class="small muted" style="margin-top:4px">Cada rolo rende cerca de <b>${fmt(ppr,0)} peças</b>${est ? " (estimativa: este modelo ainda não foi cortado)" : " neste modelo"}.</div>`;
     lista().forEach(c => { const el = document.querySelector(`[data-pc="${CSS.escape(c)}"]`); if (el) el.textContent = st.rolos[c] ? `${st.rolos[c]} rolo${st.rolos[c]>1?"s":""} · ≈ ${fmt(Math.round(st.rolos[c]*ppr))} pç` : "0"; });
   };
   const draw = () => {
@@ -1085,7 +1089,7 @@ function viewCadastros(){
   } else if (sub === "produtos"){
     body = `<div class="row between"><h2>Produtos e ficha de custo</h2>${ed?`<button class="btn pri sm" id="newprod">+ Novo produto</button>`:""}</div>
     ${S.produtos.length?S.produtos.map(p=>`<div class="card" style="padding:12px"><div class="row between"><div><b>${esc(p.nome)}</b>${p.sku?` <span class="small muted">SKU ${esc(p.sku)}</span>`:""}
-      <div class="small muted">Consumo ${p.consumoKg?fmt(pn(p.consumoKg),3)+" kg/pç":"não definido"} · rolo ${p.kgRolo?fmt(pn(p.kgRolo),1)+" kg":"—"} · tecido ${p.precoKg?brl(pn(p.precoKg))+"/kg":"—"}</div></div>
+      <div class="small muted">Consumo ${p.consumoKg?fmt(pn(p.consumoKg),3)+" kg/pç":"não definido"} · rolo ${p.kgRolo?fmt(pn(p.kgRolo),1)+" kg":"—"} · ${(()=>{const t=statsProd(p.id);return t.pprReal?`<b>${fmt(t.pprReal,0)} pç/rolo</b> (medido no corte)`:t.pprCad?`${fmt(t.pprCad,0)} pç/rolo (estimado)`:"pç/rolo: ainda sem corte"})()} · tecido ${p.precoKg?brl(pn(p.precoKg))+"/kg":"—"}</div></div>
       <div class="row"><b class="num">${brl(custoProduto(p))}</b>${ed?`<button class="btn sm" data-prod="${esc(p.id)}">Editar</button>`:""}</div></div>
     <div class="tbl-wrap"><table><tbody>${(p.itens||[]).map(it=>{const i=insumo(it.insumoId);return `<tr><td>${esc(i?.nome||"Removido")}</td><td class="muted">${esc(i?.tipo||"")}</td><td class="r">${fmt(pn(it.qtd),3)} ${esc(i?.un||"")}</td><td class="r">${brl(pn(it.qtd)*(i?.valor||0))}</td></tr>`}).join("")}</tbody></table></div></div>`).join(""):`<div class="empty">Nenhum produto cadastrado.</div>`}`;
   } else {
@@ -1291,6 +1295,7 @@ function prodForm(p){
     <div class="fgrid">${field({name:"pnome",label:"Nome do produto",value:p?.nome||"",full:true})}${field({name:"psku",label:"SKU (opcional)",value:p?.sku||""})}
       ${field({name:"pcons",label:"Consumo de tecido por peça (kg)",type:"num",value:p?.consumoKg??"",ph:"Ex.: 0,176"})}
       ${field({name:"prolo",label:"Peso médio do rolo (kg)",type:"num",value:p?.kgRolo??"",ph:"Ex.: 19"})}
+      ${(()=>{const t=p?statsProd(p.id):{};return field({name:"pppr",label:"Peças por rolo"+(t.pprReal?` · medido no corte: ${fmt(t.pprReal,0)}`:""),type:"num",value:p?.ppr||(t.pprReal?Math.round(t.pprReal):""),ph:"Ex.: 115"})})()}
       ${field({name:"ppreco",label:"Preço do kg do tecido (R$)",type:"num",value:p?.precoKg??"",ph:"Ex.: 30,80"})}</div>
     <div class="row between"><h3>Ficha de custo</h3><b id="pcusto" class="num"></b></div>
     <div id="pitens" style="display:flex;flex-direction:column;gap:8px"></div>
@@ -1309,7 +1314,7 @@ function prodForm(p){
     $("#psave").onclick = () => {
       const nome = $("#f_pnome").value.trim(); if (!nome){ toast("Informe o nome do produto."); return; }
       const id = p?.id || "p" + uid();
-      write("produtos/"+id, {nome, sku:$("#f_psku").value.trim(), consumoKg:pn($("#f_pcons").value), kgRolo:pn($("#f_prolo").value), precoKg:pn($("#f_ppreco").value), itens}); closeModal();
+      write("produtos/"+id, {nome, sku:$("#f_psku").value.trim(), consumoKg:pn($("#f_pcons").value), kgRolo:pn($("#f_prolo").value), ppr:pn($("#f_pppr").value), precoKg:pn($("#f_ppreco").value), itens}); closeModal();
     };
     const pd = $("#pdel"); if (pd) pd.onclick = () => {
       if (S.ops.some(o => o.produtoId === p.id)){ toast("Este produto tem pedidos lançados e não pode ser excluído."); return; }
@@ -1319,7 +1324,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 38;
+const APP_V = 39;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
