@@ -745,6 +745,18 @@ function pedidoForm(){
     };
   });
 }
+function pagBloco(g){
+  const op = g.id ? S.ops.find(o => o.id === g.id) : null;
+  if (!op){ const its = S.lanc.filter(l => l.tipo !== "recebimento" && !l.opId).map(l => ({l, ab: pn(l.valor) - (S.F.map[l.id]?.pago || 0)})).filter(x => x.ab > 0.005).sort((a,b) => (b.l.data||"").localeCompare(a.l.data||""));
+    return `<div class="op"><div class="row" style="gap:8px"><span class="code">$</span><div><b>Serviços gerais</b><div class="small muted">motoboy, frete e outros fora dos pedidos</div></div></div>
+    ${its.map(x => `<div class="row between small"><span>${esc(x.l.desc || "Serviço")}${x.l.data ? ` <span class="muted">· ${fdate(x.l.data)}</span>` : ""}</span><span>${brl(x.ab)}</span></div>`).join("")}
+    <div class="row between small"><span class="muted">Falta pagar</span><b class="gold">${brl(g.tot)}</b></div></div>`; }
+  const etapas = g.todas.filter(x => x.key !== "Servicos" || x.v > 0.005);
+  const fl = `<div class="flow ${etapas.length > 4 ? "f5" : ""}">${etapas.map(x => { const st = x.v <= 0.005 ? "" : x.ab > 0.005 ? "now" : "done";
+    return `<div class="fs ${st}"><i>$</i><b>${x.nome === "Outros serviços" ? "Outros" : x.nome}</b><small>${!st ? "a lançar" : st === "done" ? "pago ✓" : brl(x.ab)}</small></div>`; }).join("")}</div>`;
+  return `<div class="op"><div class="row between"><div class="row" style="gap:8px"><span class="code">${opCode(op)}</span><div><b>${esc(produto(op.produtoId)?.nome || "")}</b><div class="small muted">${fmt(pn(op.qtd))} peças</div></div></div></div>
+    ${fl}<div class="row between small"><span class="muted">Falta pagar deste pedido</span><b class="gold">${brl(g.tot)}</b></div></div>`;
+}
 function viewInicio(){
   syncPagTecido();
   const F = S.F; const ab = Math.max(0, F.aberto); const feito = F.totCob + F.totDesp;
@@ -754,22 +766,28 @@ function viewInicio(){
   const pend = all.filter(o => calc(o).aberta || finOp(o.id, F).aberto > 0.005);
   const porOp = [...all.filter(o => !pendente(o)).map(o => ({nome:`${opCode(o)} · ${produto(o.produtoId)?.nome || ""}`, id:o.id})), {nome:"Serviços gerais (sem pedido)", id:""}]
     .map(g => { const ls = S.lanc.filter(l => l.tipo !== "recebimento" && (l.opId || "") === g.id);
-      const secs = SECOES.map(([key,nome]) => ({nome, ab: sum(ls.filter(l => secaoDe(l) === key), l => pn(l.valor) - (F.map[l.id]?.pago || 0))})).filter(x => x.ab > 0.005);
-      return {...g, secs, tot: sum(secs, x => x.ab)}; }).filter(g => g.tot > 0.005);
+      const todas = SECOES.map(([key,nome]) => { const it = ls.filter(l => secaoDe(l) === key); return {key, nome, v: sum(it, l => pn(l.valor)), ab: sum(it, l => pn(l.valor) - (F.map[l.id]?.pago || 0))}; });
+      const secs = todas.filter(x => x.ab > 0.005);
+      return {...g, todas, secs, tot: sum(secs, x => x.ab)}; }).filter(g => g.tot > 0.005);
+  if (!adm()){ // Thaty vê só as produções em andamento
+    const andam = new Set(all.filter(o => calc(o).aberta).map(o => o.id));
+    for (let i = porOp.length - 1; i >= 0; i--) if (porOp[i].id && !andam.has(porOp[i].id)) porOp.splice(i, 1);
+  }
+  const abV = adm() ? ab : sum(porOp, g => g.tot);
   const prods = [...new Set(all.map(o => o.produtoId))].map(pid => all.find(o => o.produtoId === pid)).filter(Boolean);
   const nome = adm() ? "Manuel" : "Thaty ✨";
   return `<div class="welcome">Olá, <b>${nome}</b></div>
   <div class="card hero2">
-    ${ab > 0.005 ? `<div class="lbl">Falta pagar</div><div class="big">${brl(ab)}</div>
+    ${abV > 0.005 ? `<div class="lbl">Falta pagar${adm() ? "" : " · produções em andamento"}</div><div class="big">${brl(abV)}</div>
 ` : `<div class="lbl">Sua conta</div><div class="big" style="color:var(--ok)">Tudo pago ✓</div>`}
-    <div class="ln"><span>Já foi feito</span><span class="v">${brl(feito)}</span></div>
+    ${adm() ? `<div class="ln"><span>Já foi feito</span><span class="v">${brl(feito)}</span></div>
     <div class="ln"><span>Você já pagou</span><span class="v" style="color:var(--ok)">− ${brl(F.totRec)}</span></div>
     <div class="ln tot"><span>Falta pagar</span><span class="v">${brl(ab)}</span>${F.credito > 0.005 ? `<small>já descontados ${brl(F.credito)} de saldo a seu favor</small>` : ""}</div>
-    ${confere ? `<div class="okline">✓ Contas conferidas: todos os valores batem.</div>` : ""}
-    ${ab > 0.005 ? `<div class="paybox"><div><span>Pix</span><b>${PIX.chave}</b><small>${PIX.banco} · ${PIX.nome}</small></div><button class="btn pri" data-copiar="${PIX.chave}">Copiar chave Pix</button></div>
-    ${!S.readonly ? `<button class="btn ghost sm" data-novo="recebimento" style="align-self:flex-start">Já paguei, quero informar</button>` : ""}` : ""}
+    ${confere ? `<div class="okline">✓ Contas conferidas: todos os valores batem.</div>` : ""}` : ""}
+    ${abV > 0.005 ? `<div class="paybox"><div><span>Pix</span><b>${PIX.chave}</b><small>${PIX.banco} · ${PIX.nome}</small></div><button class="btn pri" data-copiar="${PIX.chave}">Copiar chave Pix</button></div>
+    ${!S.readonly ? `<button class="btn ghost sm" data-novo="recebimento" style="align-self:flex-start">Comprovante de pagamento</button>` : ""}` : ""}
   </div>
-  ${porOp.length ? `<div class="card"><div class="lbl">O que falta pagar, por pedido</div>${porOp.map(g => `<div class="fp"><div class="row between"><b>${esc(g.nome)}</b><b class="gold">${brl(g.tot)}</b></div>${g.secs.map(x => `<div class="row between small"><span class="muted">${x.nome}</span><span>${brl(x.ab)}</span></div>`).join("")}</div>`).join("")}<button class="btn sm" data-goto="financeiro">Ver extrato completo →</button></div>` : ""}
+  ${porOp.length ? `<h2 style="margin:4px 0 0">O que falta pagar</h2><div class="oplist">${porOp.map(pagBloco).join("")}</div><button class="btn sm" data-goto="financeiro" style="align-self:flex-start">Ver extrato →</button>` : ""}
   ${notifBox()}
   ${!adm() ? "" : `<div class="row between"><h2>Seus pedidos</h2>${all.length > pend.length ? `<button class="btn ghost sm" data-goto="producoes">Ver todos</button>` : ""}</div>
   ${pend.length ? `<div class="oplist">${pend.map(opCard).join("")}</div>` : `<div class="empty">Nenhum pedido em andamento.</div>`}`}
@@ -1331,7 +1349,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 42;
+const APP_V = 43;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
