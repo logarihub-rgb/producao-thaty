@@ -698,9 +698,11 @@ function custoPeca(op, k){
   const qs = sum(k.partes, t => t.q);
   const cost = qs ? sum(k.partes, t => t.q*t.un)/qs : pn(S.cfg.costuraUn);
   const it = [
-    (() => { const st = statsProd(op.produtoId); return st.valor > 0
-      ? {n:"Tecido", v: st.rate, d:`${brl(st.valor)} de tecido (${fmt(st.rolos)} rolos) ÷ ${fmt(st.qtd)} peças de ${st.n} produç${st.n>1?"ões":"ão"}`, p:false}
-      : {n:"Tecido", v:0, d:"ainda não comprado", p:true}; })(),
+    (() => { const st = statsProd(op.produtoId); const pad = pn(produto(op.produtoId)?.tecidoPc);
+      if (pad > 0 && !adm()) return {n:"Tecido", v: pad, d:"valor do tecido por peça (com margem para variação de lote e grade)", p:false};
+      return st.valor > 0
+      ? {n:"Tecido", v: st.rate, d:`${brl(st.valor)} de tecido (${fmt(st.rolos)} rolos) ÷ ${fmt(st.qtd)} peças cortadas${pad > 0 ? ` · para a Thaty aparece ${brl(pad)}` : ""}`, p:false}
+      : pad > 0 ? {n:"Tecido", v: pad, d:"valor padrão por peça", p:false} : {n:"Tecido", v:0, d:"ainda não comprado", p:true}; })(),
     {n:"Corte", v: k.corteUn || pn(S.cfg.corteUn), d:"valor fixo por peça cortada", p: !k.corteUn},
     {n:"Costura (oficina)", v: cost, d:"valor por peça costurada", p: !qs},
     {n:"Assessoria", v: pn(S.cfg.assessoria), d:"acompanhamento e conferência, só na entrega", p:false},
@@ -1413,7 +1415,8 @@ function prodForm(p){
       ${field({name:"pcons",label:"Consumo de tecido por peça (kg)",type:"num",value:p?.consumoKg??"",ph:"Ex.: 0,176"})}
       ${field({name:"prolo",label:"Peso médio do rolo (kg)",type:"num",value:p?.kgRolo??"",ph:"Ex.: 19"})}
       ${(()=>{const t=p?statsProd(p.id):{};return field({name:"pppr",label:"Peças por rolo"+(t.pprReal?` · medido no corte: ${fmt(t.pprReal,0)}`:""),type:"num",value:p?.ppr||(t.pprReal?Math.round(t.pprReal):""),ph:"Ex.: 115"})})()}
-      ${field({name:"ppreco",label:"Preço do kg do tecido (R$)",type:"num",value:p?.precoKg??"",ph:"Ex.: 30,80"})}</div>
+      ${field({name:"ppreco",label:"Preço do kg do tecido (R$)",type:"num",value:p?.precoKg??"",ph:"Ex.: 30,80"})}
+      ${field({name:"ptpc",label:"Tecido por peça para a Thaty (R$, com margem)",type:"num",value:p?.tecidoPc??"",ph:"Ex.: 2,80"})}</div>
     <div class="row between"><h3>Insumos / serviços</h3><b id="pcusto" class="num"></b></div>
     <div class="small muted">Valor pago e quantas unidades ele cobre. Ex.: etiqueta R$ 15 por 1.000 unidades = R$ 0,015 por peça.</div>
     <div class="insrow insh small muted"><span>Nome</span><span>Valor R$</span><span>Unid.</span><span>Por peça</span><span></span></div>
@@ -1438,7 +1441,7 @@ function prodForm(p){
       const nome = $("#f_pnome").value.trim(); if (!nome){ toast("Informe o nome do produto."); return; }
       const id = p?.id || "p" + uid();
       itens = itens.filter(it => (it.nome || "").trim()).map(it => ({nome: it.nome.trim(), valor: pn(it.valor), un: pn(it.un) || 1}));
-      write("produtos/"+id, {nome, sku:$("#f_psku").value.trim(), consumoKg:pn($("#f_pcons").value), kgRolo:pn($("#f_prolo").value), ppr:pn($("#f_pppr").value), precoKg:pn($("#f_ppreco").value), itens}); closeModal();
+      write("produtos/"+id, {nome, sku:$("#f_psku").value.trim(), consumoKg:pn($("#f_pcons").value), kgRolo:pn($("#f_prolo").value), ppr:pn($("#f_pppr").value), precoKg:pn($("#f_ppreco").value), tecidoPc:pn($("#f_ptpc").value), itens}); closeModal();
     };
     const pd = $("#pdel"); if (pd) pd.onclick = () => {
       if (S.ops.some(o => o.produtoId === p.id)){ toast("Este produto tem pedidos lançados e não pode ser excluído."); return; }
@@ -1448,7 +1451,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 64;
+const APP_V = 65;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
