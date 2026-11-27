@@ -927,8 +927,10 @@ function viewFinanceiro(){
   ${adm() ? `<div class="card"><h2>Pagamentos da Thaty</h2>${recs.length ? recs.map(lancRow).join("") : `<div class="small muted">Nenhum pagamento lançado.</div>`}</div>` : ""}
   ${adm() && fo === "todas" ? oficinasResumo(S.ops.map(o => ({o, k:calc(o)}))) : ""}`;
 }
+function linkThaty(){ return location.origin + location.pathname.replace(/[^/]*$/,"") + "novo.html?k=" + THATY_K + "&v=" + APP_V; }
 function viewMais(){
-  return viewCadastros();
+  return `${viewCadastros()}
+  ${adm() ? `<details class="mini"><summary>Link do app da Thaty</summary><div class="card" style="margin-top:8px"><div class="small muted">Sempre na versão mais nova (v${APP_V}). Mande este link para ela quando tiver atualização.</div><div style="word-break:break-all;font-size:13px;margin:8px 0">${esc(linkThaty())}</div><button class="btn pri" data-copiar="${esc(linkThaty())}">Copiar link</button></div></details>` : ""}`;
 }
 function lancForm(tipo, l, opIdDefault, extra0 = {}){
   const novo = !l;
@@ -1091,7 +1093,7 @@ function bind(){
     const obs = "Cores: " + cores.map(c => `${c.cor} ${fmt(pn(c.qtd))}`).join(" · ") + (p.obs ? " · " + p.obs : "");
     opForm(null, {produtoId:p.produtoId, qtd, obs}, opId => { const {id:_, ...d} = p; write("pedidos/" + p.id, {...d, status:"produzindo", opId}); toast("Produção criada a partir do pedido ✓"); }); });
   document.querySelectorAll("[data-peddel]").forEach(b => b.onclick = () => confirmBox("Excluir este pedido?", () => write("pedidos/" + b.dataset.peddel, null)));
-  document.querySelectorAll("[data-copiar]").forEach(b => b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.copiar); toast("Chave Pix copiada."); } catch(e){ prompt("Copie a chave Pix:", b.dataset.copiar); } });
+  document.querySelectorAll("[data-copiar]").forEach(b => b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.copiar); toast(b.dataset.copiar.startsWith("http") ? "Link copiado." : "Chave Pix copiada."); } catch(e){ prompt("Copie a chave Pix:", b.dataset.copiar); } });
   const an = $("#ativarnotif"); if (an) an.onclick = ativarNotif;
   const mt = $("#maistabs"); if (mt) mt.onclick = e => { const b = e.target.closest("button"); if (b){ S.mais = b.dataset.m; render(); } };
   document.querySelectorAll("[data-back]").forEach(b => b.onclick = () => go("producoes"));
@@ -1229,25 +1231,34 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
+const APP_V = 32;
+const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
-    <p class="muted">Digite seu PIN para entrar.</p>
-    <input id="pin" type="password" inputmode="numeric" autocomplete="current-password" aria-label="PIN" maxlength="8">
-    <button class="btn pri" id="entrar">Entrar</button><div id="lerr" class="small" style="color:var(--bad)"></div></div>`;
+    <p class="muted">Quem está entrando?</p>
+    <button class="btn pri big-cta" id="entthaty">Thaty ✨</button>
+    <button class="btn big-cta" id="entmanuel">Manuel</button>
+    <div id="pinbox" hidden style="display:flex;flex-direction:column;gap:10px">
+      <input id="pin" type="password" inputmode="numeric" autocomplete="current-password" aria-label="Senha" placeholder="Senha" maxlength="8">
+      <button class="btn pri" id="entrar">Entrar</button></div>
+    <div id="lerr" class="small" style="color:var(--bad)"></div></div>`;
 }
 function bindLogin(){
-  const go_ = async () => {
-    const pin = $("#pin").value.trim(); if (!pin) return;
-    $("#entrar").disabled = true; $("#entrar").textContent = "Entrando…"; $("#lerr").textContent = "";
+  const go_ = async (pin, btn) => {
+    if (!pin) return;
+    btn.disabled = true; const t0 = btn.textContent; btn.textContent = "Entrando…"; $("#lerr").textContent = "";
     S.pin = pin;
     try { const j = await api("login"); S.user = j.nome; S.ok = true; store.set("pt_pin", pin); store.set("pt_user", j.nome); entrou(); }
-    catch(e){ S.pin = ""; $("#lerr").textContent = e.message === "PIN inválido" ? "PIN incorreto." : "Sem conexão com o servidor. Tente de novo."; $("#entrar").disabled = false; $("#entrar").textContent = "Entrar"; }
+    catch(e){ S.pin = ""; $("#lerr").textContent = e.message === "PIN inválido" ? "Senha incorreta." : "Sem conexão com o servidor. Tente de novo."; btn.disabled = false; btn.textContent = t0; }
   };
-  $("#entrar").onclick = go_; $("#pin").onkeydown = e => { if (e.key === "Enter") go_(); }; $("#pin").focus();
+  $("#entthaty").onclick = () => go_(THATY_K, $("#entthaty"));
+  $("#entmanuel").onclick = () => { $("#pinbox").hidden = false; $("#pinbox").style.display = "flex"; $("#pin").focus(); };
+  $("#pinbox").style.display = "none";
+  $("#entrar").onclick = () => go_($("#pin").value.trim(), $("#entrar")); $("#pin").onkeydown = e => { if (e.key === "Enter") go_($("#pin").value.trim(), $("#entrar")); };
 }
 function sair(){ caches.delete("pt-auth").catch(()=>{}); S.pushAtivo = false; store.set("pt_pin", null); store.set("pt_user", null); store.set("ptn_cache", null); S.ok = false; S.pin = ""; S.user = ""; COLS.forEach(c => S.loaded[c] = false); $("#who").hidden = true; render(); }
 function entrou(){
-  const w = $("#who"); w.hidden = false; w.textContent = S.user + " · sair"; w.onclick = () => sair();
+  const w = $("#who"); w.hidden = false; w.textContent = S.user + " · trocar"; w.onclick = () => sair();
   render(); carregar(); checarPush();
   clearInterval(S.poll); S.poll = setInterval(checar, 25000);
 }
@@ -1279,7 +1290,7 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catc
     if (store.get("pt_pin_prev") !== p){ store.set("ptn_cache", null); store.set("pt_pin_prev", p); }
     if (lerCache()) setSync("Atualizando…");
     entrou();
-    if (!S.user) api("login").then(j => { S.user = j.nome; store.set("pt_user", j.nome); const w = $("#who"); if (w) w.textContent = S.user + " · sair"; }).catch(() => {});
+    if (!S.user) api("login").then(j => { S.user = j.nome; store.set("pt_user", j.nome); const w = $("#who"); if (w) w.textContent = S.user + " · trocar"; }).catch(() => {});
   }
   render();
 })();
