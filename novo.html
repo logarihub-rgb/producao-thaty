@@ -312,7 +312,7 @@ const DEF_CFG = {extra:2.9, assessoria:1.2, corteUn:0.4, corteLocal:"THÁSSIO", 
 const VIEWS = ["inicio","producoes","financeiro","mais"];
 const COLS = ["insumos","produtos","ops","lanc","pedidos"];
 const API = window.PT_API || "";
-const S = {pin:"", user:"", ok:false, insumos:[], produtos:[], ops:[], lanc:[], pedidos:[], cfg:{...DEF_CFG}, loaded:{}, view:"inicio", opId:null, sub:"insumos", orc:{prod:"",qtd:""}, fin:{op:"todas"}, readonly:false};
+const S = {pin:"", user:"", ok:false, insumos:[], produtos:[], ops:[], lanc:[], pedidos:[], cfg:{...DEF_CFG}, loaded:{}, view:"inicio", opId:null, sub:"insumos", orc:{prod:"",qtd:""}, fin:{op:"aberto"}, readonly:false};
 const CAT_COB = ["Tecido","Corte","Costura","Assessoria","Outro"];
 const CAT_DESP = ["Modelagem","Pilotagem","Impressão de risco","Frete motoboy","Carreto","Outro"];
 
@@ -950,15 +950,16 @@ function viewFinanceiro(){
   syncPagTecido();
   const F = S.F; const ed = !S.readonly; const fo = S.fin.op;
   let ls = [...S.lanc];
-  if (fo === "geral") ls = ls.filter(l => !l.opId); else if (fo !== "todas") ls = ls.filter(l => l.opId === fo);
+  if (fo === "aberto"){ const ab = new Set(S.ops.filter(o => calc(o).aberta).map(o => o.id)); ls = ls.filter(l => l.opId && ab.has(l.opId)); }
+  else if (fo === "geral") ls = ls.filter(l => !l.opId); else if (fo !== "todas") ls = ls.filter(l => l.opId === fo);
   const recs = ls.filter(l => l.tipo === "recebimento").sort((a,b)=>(b.data||"").localeCompare(a.data||""));
-  const opIdF = fo !== "todas" && fo !== "geral" ? fo : "";
+  const opIdF = fo !== "todas" && fo !== "geral" && fo !== "aberto" ? fo : "";
   const btns = adm() ? `<div class="row"><button class="btn" data-novo="recebimento">+ Pagamento</button><button class="btn" data-novo="despesa">+ Serviço</button></div>` : ed ? `<button class="btn pri" data-novo="recebimento">Informei um pagamento</button>` : "";
   return `<div class="row between"><h1>Extrato</h1>${btns}</div>
-  <div class="field"><label for="finop">Mostrar</label><select id="finop"><option value="todas">Todos os pedidos</option><option value="geral" ${fo==="geral"?"selected":""}>Serviços gerais (sem pedido)</option>${sortedOps().map(o=>`<option value="${esc(o.id)}" ${fo===o.id?"selected":""}>${opCode(o)} · ${esc(produto(o.produtoId)?.nome||"")}</option>`).join("")}</select></div>
+  <div class="field"><label for="finop">Mostrar</label><select id="finop"><option value="aberto">Produções em andamento (ainda não entregues)</option><option value="todas" ${fo==="todas"?"selected":""}>Tudo (histórico completo)</option><option value="geral" ${fo==="geral"?"selected":""}>Serviços gerais (sem pedido)</option>${sortedOps().map(o=>`<option value="${esc(o.id)}" ${fo===o.id?"selected":""}>${opCode(o)} · ${esc(produto(o.produtoId)?.nome||"")}</option>`).join("")}</select></div>
   <div class="card"><h2>Resumo por etapa</h2><div class="small muted">Toque numa etapa para ver cada lançamento.</div>${contaHtml(ls, opIdF)}</div>
-  ${extratoHtml(ls)}
-  ${adm() ? `<div class="card"><h2>Pagamentos da Thaty</h2>${recs.length ? recs.map(lancRow).join("") : `<div class="small muted">Nenhum pagamento lançado.</div>`}</div>` : ""}
+  ${fo === "aberto" ? "" : extratoHtml(ls)}
+  ${adm() && fo !== "aberto" ? `<div class="card"><h2>Pagamentos da Thaty</h2>${recs.length ? recs.map(lancRow).join("") : `<div class="small muted">Nenhum pagamento lançado.</div>`}</div>` : ""}
   ${adm() && fo === "todas" ? oficinasResumo(S.ops.map(o => ({o, k:calc(o)}))) : ""}`;
 }
 const TEC_API = "https://script.google.com/macros/s/AKfycbyQv3EXg8p4_41qEuMetFS5D7rf9SCjlbpyPJ3i71U3NaOEJM9qj5SaHOn49GnSwUYc/exec";
@@ -1194,7 +1195,7 @@ function bind(){
   const fl = $("#filtro"); if (fl) fl.onclick = e => { const b = e.target.closest("button"); if (b){ S.filtro = b.dataset.f; render(); } };
   const st = $("#subtabs"); if (st) st.onclick = e => { const b = e.target.closest("button"); if (b){ S.sub = b.dataset.s; render(); } };
   document.querySelectorAll("[data-ver]").forEach(b => b.onclick = e => { e.stopPropagation(); verAnexo(b.dataset.ver, b.dataset.ct); });
-  document.querySelectorAll("[data-novo]").forEach(b => b.onclick = () => lancForm(b.dataset.novo, null, S.view === "producoes" ? S.opId : (S.fin.op !== "todas" && S.fin.op !== "geral" ? S.fin.op : "")));
+  document.querySelectorAll("[data-novo]").forEach(b => b.onclick = () => lancForm(b.dataset.novo, null, S.view === "producoes" ? S.opId : (!["todas","geral","aberto"].includes(S.fin.op) ? S.fin.op : "")));
   document.querySelectorAll("[data-pagar]").forEach(b => b.onclick = e => { e.preventDefault(); e.stopPropagation(); const [op, sec, v] = b.dataset.pagar.split("|"); lancForm("recebimento", null, op, {secao: sec, valor: +v}); });
   document.querySelectorAll("[data-serv]").forEach(b => b.onclick = e => { e.preventDefault(); e.stopPropagation(); lancForm("despesa", null, b.dataset.serv); });
   document.querySelectorAll("[data-editl]").forEach(b => b.onclick = () => { const l = S.lanc.find(x => x.id === b.dataset.editl); if (l) lancForm(l.tipo, l); });
@@ -1325,7 +1326,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 40;
+const APP_V = 41;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
