@@ -1441,7 +1441,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 56;
+const APP_V = 57;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
@@ -1465,6 +1465,7 @@ function bindLogin(){
   $("#entmanuel").onclick = () => { $("#pinbox").hidden = false; $("#pinbox").style.display = "flex"; $("#pin").focus(); };
   $("#pinbox").style.display = "none";
   $("#entrar").onclick = () => go_($("#pin").value.trim(), $("#entrar")); $("#pin").onkeydown = e => { if (e.key === "Enter") go_($("#pin").value.trim(), $("#entrar")); };
+  $("#pin").oninput = e => { const v = e.target.value.trim(); if (v.length === 4 && /^\d{4}$/.test(v) && !$("#entrar").disabled) go_(v, $("#entrar")); };
 }
 function sair(){ S._abriu = false; caches.delete("pt-auth").catch(()=>{}); S.pushAtivo = false; store.set("pt_pin", null); store.set("pt_user", null); store.set("ptn_cache", null); S.ok = false; S.pin = ""; S.user = ""; COLS.forEach(c => S.loaded[c] = false); $("#who").hidden = true; render(); }
 function arrumaAbas(){
