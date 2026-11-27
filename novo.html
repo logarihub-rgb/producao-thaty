@@ -295,7 +295,7 @@ details.ent>summary .entv{color:#c9a35a;font-size:13px}details.ent>summary .entv
 .btn.big-cta2{width:100%;padding:14px;border:1.5px solid #c9a35a;background:rgba(201,163,90,.12);color:#e9cf98;font-weight:700;font-size:15px;border-radius:12px}
 html,body{overflow-x:hidden;max-width:100%}
 #who{max-width:42vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.flow .fs{min-width:0}.flow .fs b,.flow .fs small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.flow .fs{min-width:0}.flow .fs small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}.flow .fs b{white-space:normal;line-height:1.15;text-align:center;letter-spacing:-.2px}
 </style>
 </head>
 <body>
@@ -784,10 +784,14 @@ function secsDe(opId){
   return {id: opId || "", todas, secs, tot: sum(secs, x => x.ab)};
 }
 function pagFlow(op){
-  const g = secsDe(op.id); const etapas = g.todas;
+  const g = secsDe(op.id);
+  // serviços gerais (sem pedido) lançados depois que o pedido começou também valem para ele
+  const ger = S.lanc.filter(l => l.tipo !== "recebimento" && !l.opId && (l.data || "") >= (op.data || ""));
+  const gv = sum(ger, l => pn(l.valor)), gab = sum(ger, l => pn(l.valor) - (S.F.map[l.id]?.pago || 0));
+  const etapas = g.todas.map(x => x.key === "Servicos" ? {...x, v: x.v + gv, ab: x.ab + gab, ger: gv > 0.005} : x);
   const serv = S.lanc.filter(l => l.tipo !== "recebimento" && l.opId === op.id && secaoDe(l) === "Servicos");
   return `<div class="paylbl">Pagamentos · ${opCode(op)}</div><div class="flow ${etapas.length > 4 ? "f5" : ""}">${etapas.map(x => { const st = x.v <= 0.005 ? "" : x.ab > 0.005 ? "now" : "done";
-    return `<div class="fs ${st}"><i>$</i><b>${x.nome === "Outros serviços" ? "Serviços" : x.nome}</b><small>${!st ? (x.key === "Servicos" ? "nenhum" : "a lançar") : st === "done" ? "pago ✓" : brl(x.ab)}</small></div>`; }).join("")}</div>
+    return `<div class="fs ${st}"><i>$</i><b>${x.nome === "Outros serviços" ? "Serviços gerais" : x.nome}</b><small>${!st ? (x.key === "Servicos" ? "nenhum" : "a lançar") : st === "done" ? "pago ✓" : brl(x.ab)}</small></div>`; }).join("")}</div>
     ${serv.map(l => { const a = pn(l.valor) - (S.F.map[l.id]?.pago || 0); return `<div class="row between small"><span>${esc(l.desc || "Serviço")} <span class="muted">· ${opCode(op)}</span></span><span>${a > 0.005 ? brl(a) : "pago ✓"}</span></div>`; }).join("")}`;
 }
 function pagBloco(g){
@@ -1029,8 +1033,8 @@ function extratoHtml(ls){
   let saldo = 0; const rows = ord.map(l => { const rec = l.tipo === "recebimento"; saldo += rec ? -pn(l.valor) : pn(l.valor); return {l, rec, saldo}; }).reverse();
   if (!rows.length) return "";
   const lim = S.extTodos ? rows : rows.slice(0, 25);
-  return `<div class="card"><h2>Extrato</h2><div class="small muted">Tudo o que aconteceu, do mais recente para o mais antigo. Embaixo de cada valor aparece como ficou a conta depois dele.</div><div>
-    ${lim.map(({l,rec,saldo}) => `<div class="ext"><span class="d">${fdate(l.data).slice(0,5)}</span><span><b>${rec ? "Pagamento recebido ✓" : esc(l.cat || "Serviço")}</b> <span class="small muted">· ${opCode(opById(l.opId))}</span></span><span class="v ${rec?"pg":""}">${rec?"− ":""}${brl(pn(l.valor))}</span><span class="ds">${esc(l.desc||"")}</span><span class="sl">${saldo < -0.005 ? `saldo a favor ${brl(-saldo)}` : `falta pagar ${brl(saldo)}`}</span>${rec ? alocHtml(l.id) : ""}</div>`).join("")}
+  return `<div class="card"><h2>Extrato</h2><div class="small muted">Tudo o que aconteceu, do mais recente para o mais antigo.</div><div>
+    ${lim.map(({l,rec,saldo}) => `<div class="ext"><span class="d">${fdate(l.data).slice(0,5)}</span><span><b>${rec ? "Pagamento recebido ✓" : esc(l.cat || "Serviço")}</b> <span class="small muted">· ${opCode(opById(l.opId))}</span></span><span class="v ${rec?"pg":""}">${rec?"− ":""}${brl(pn(l.valor))}</span><span class="ds">${esc(l.desc||"")}</span>${rec ? alocHtml(l.id) : ""}</div>`).join("")}
   </div>${rows.length > lim.length ? `<button class="btn sm" id="extall">Ver todos (${rows.length})</button>` : ""}</div>`;
 }
 function viewFinanceiro(){
@@ -1435,7 +1439,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 54;
+const APP_V = 55;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
