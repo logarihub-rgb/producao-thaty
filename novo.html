@@ -445,10 +445,11 @@ function calc(op){
   const prod = produto(op.produtoId);
   const qtd = pn(op.qtd);
   const custoTecido = op.retalho ? 0 : pn(op.kg) * pn(op.precoKg);
-  const porItem = qtd ? custoTecido / qtd : 0;
-  const realUn = porItem + S.cfg.extra;
   const c = op.corte || {};
   const cortado = sum(c.entregas, e => pn(e.qtd));
+  const pecasReais = cortado > 0 ? cortado : qtd;
+  const porItem = pecasReais ? custoTecido / pecasReais : 0;
+  const realUn = porItem + S.cfg.extra;
   const corteUn = pn(c.custoUn);
   const cortePago = sum(c.pagamentos, p => pn(p.valor));
   const partes = (op.costuras || []).map((t,i) => {
@@ -678,7 +679,9 @@ function heroThaty(){
 function statsProd(prodId){
   const os = S.ops.filter(o => o.produtoId === prodId && !pendente(o));
   const valor = sum(os, o => o.retalho ? 0 : pn(o.kg)*pn(o.precoKg)), kg = sum(os, o => o.retalho ? 0 : pn(o.kg));
-  const qtd = sum(os, o => pn(o.qtd)), rolos = sum(os, o => o.retalho ? 0 : pn(o.rolos));
+  // peças reais: o que saiu do corte; se ainda não cortou, a quantidade pedida
+  const pecasOp = o => { const c = sum((o.corte||{}).entregas, e => pn(e.qtd)); return c > 0 ? c : pn(o.qtd); };
+  const qtd = sum(os, pecasOp), rolos = sum(os, o => o.retalho ? 0 : pn(o.rolos));
   const comPreco = os.filter(o => pn(o.precoKg) > 0).sort((a,b) => (b.num||0)-(a.num||0))[0];
   const cst = os.flatMap(o => o.costuras || []).filter(t => pn(t.custoUn) > 0).slice(-1)[0];
   // peças por rolo medidas de verdade: só produções já cortadas (peças cortadas ÷ rolos)
@@ -1445,7 +1448,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 63;
+const APP_V = 64;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
