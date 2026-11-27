@@ -287,6 +287,9 @@ details.card[open] .sumrow .gold:last-child{opacity:.6}
 .sl{border-bottom:1px solid var(--line);padding-bottom:8px}
 .fp{padding:10px 0;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:3px}.fp:last-of-type{border-bottom:0}
 #updbar{position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:9999;padding:14px 16px;border-radius:14px;border:1px solid #c9a35a;background:#c9a35a;color:#14110c;font:600 15px system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.5);cursor:pointer}
+details.ent>summary{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border:1px solid #c9a35a;border-radius:14px;background:rgba(201,163,90,.10);color:var(--text,#eee);font-size:15px;font-weight:600;margin-top:6px}
+details.ent>summary::before{content:none}details.ent>summary::-webkit-details-marker{display:none}
+details.ent>summary .entv{color:#c9a35a;font-size:13px}details.ent>summary .entv::after{content:"ver ▾"}details.ent[open]>summary .entv::after{content:"fechar ▴"}
 </style>
 </head>
 <body>
@@ -788,7 +791,7 @@ function viewProducoes(){
   return `<div class="row between"><h1>Pedidos</h1></div>
   ${pedidosHtml()}
   ${ab.length ? `<div class="oplist">${ab.map(x=>opCard(x.o)).join("")}</div>` : `<div class="empty">Nenhum pedido em andamento.</div>`}
-  ${fe.length ? `<details class="mini"><summary>Entregues (${fe.length})</summary><div class="oplist" style="margin-top:10px">${fe.map(x=>opCard(x.o)).join("")}</div></details>` : ""}`;
+  ${fe.length ? `<details class="mini ent"><summary><span>✓ Pedidos entregues (${fe.length})</span><span class="entv"></span></summary><div class="oplist" style="margin-top:10px">${fe.map(x=>opCard(x.o)).join("")}</div></details>` : ""}`;
 }
 function oficinasResumo(all){
   const map = {};
@@ -954,7 +957,7 @@ function viewFinanceiro(){
   else if (fo === "geral") ls = ls.filter(l => !l.opId); else if (fo !== "todas") ls = ls.filter(l => l.opId === fo);
   const recs = ls.filter(l => l.tipo === "recebimento").sort((a,b)=>(b.data||"").localeCompare(a.data||""));
   const opIdF = fo !== "todas" && fo !== "geral" && fo !== "aberto" ? fo : "";
-  const btns = adm() ? `<div class="row"><button class="btn" data-novo="recebimento">+ Pagamento</button><button class="btn" data-novo="despesa">+ Serviço</button></div>` : ed ? `<button class="btn pri" data-novo="recebimento">Informei um pagamento</button>` : "";
+  const btns = adm() ? `<div class="row"><button class="btn" data-novo="recebimento">+ Pagamento</button><button class="btn" data-novo="despesa">+ Serviço</button></div>` : ed ? `<button class="btn pri" data-novo="recebimento">Comprovante de pagamento</button>` : "";
   return `<div class="row between"><h1>Extrato</h1>${btns}</div>
   <div class="field"><label for="finop">Mostrar</label><select id="finop"><option value="aberto">Produções em andamento (ainda não entregues)</option><option value="todas" ${fo==="todas"?"selected":""}>Tudo (histórico completo)</option><option value="geral" ${fo==="geral"?"selected":""}>Serviços gerais (sem pedido)</option>${sortedOps().map(o=>`<option value="${esc(o.id)}" ${fo===o.id?"selected":""}>${opCode(o)} · ${esc(produto(o.produtoId)?.nome||"")}</option>`).join("")}</select></div>
   <div class="card"><h2>Resumo por etapa</h2><div class="small muted">Toque numa etapa para ver cada lançamento.</div>${contaHtml(ls, opIdF)}</div>
@@ -1082,7 +1085,8 @@ function viewOrcamento(){
 }
 
 function viewCadastros(){
-  const sub = S.sub; const ed = !S.readonly;
+  if (!ehManuel()) S.sub = "produtos";
+  const sub = S.sub; const ed = !S.readonly && ehManuel();
   let body = "";
   if (sub === "insumos"){
     body = `<div class="row between"><h2>Insumos e serviços</h2>${ed?`<button class="btn pri sm" id="newins">+ Novo</button>`:""}</div>
@@ -1106,6 +1110,7 @@ function viewCadastros(){
     </div><div class="row">${ed?`<button class="btn pri" id="savecfg">Salvar configurações</button>`:""}</div>
     <div class="small muted">O custo fixo por peça substitui o “+2,90” da planilha antiga no custo real.</div></div>`;
   }
+  if (!ehManuel()) return body.replace("<h2>Produtos e ficha de custo</h2>", "<h1>Produtos</h1>");
   return `<h1>Cadastros</h1><div class="subtabs" id="subtabs">${[["insumos","Insumos/serviços"],["produtos","Produtos"],["config","Configurações"]].map(([v,t])=>`<button data-s="${v}" aria-pressed="${sub===v}">${t}</button>`).join("")}</div>${body}`;
 }
 
@@ -1326,7 +1331,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 41;
+const APP_V = 42;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
@@ -1356,8 +1361,9 @@ function arrumaAbas(){
   const nav = $("#tabs"); if (!nav) return;
   const bi = nav.querySelector('[data-v="inicio"]'), bp = nav.querySelector('[data-v="producoes"]');
   if (!bi || !bp) return;
-  if (!ehManuel()){ bi.textContent = "Pagamentos"; nav.insertBefore(bp, bi); }
-  else { bi.textContent = "Início"; nav.insertBefore(bi, bp); }
+  const bm = nav.querySelector('[data-v="mais"]');
+  if (!ehManuel()){ bi.textContent = "Pagamentos"; nav.insertBefore(bp, bi); if (bm) bm.textContent = "Produtos"; }
+  else { bi.textContent = "Início"; nav.insertBefore(bi, bp); if (bm) bm.textContent = "Mais"; }
 }
 function entrou(){
   arrumaAbas(); if (!ehManuel() && !S._abriu){ S.view = "producoes"; S.opId = null; } S._abriu = true;
