@@ -1363,13 +1363,8 @@ function proxSabado(){ const d = new Date(); d.setDate(d.getDate() + ((6 - d.get
 function msgCobranca(){
   const nomeSec = k => k === "Servicos" ? "Serviços" : (SECOES.find(x => x[0] === k) || [0, k])[1];
   const blocos = []; let tot = 0;
-  // cada cobrança em aberto: quantidade × valor unitário = total (lido da descrição do lançamento)
-  const linha = l => { const ab = pn(l.valor) - (S.F.map[l.id]?.pago || 0), m = String(l.desc||"").match(/([\d.,]+)\s*(pç|kg)[^×]*×\s*(R\$\s?[\d.,]+)/);
-    let t = m ? `   ${m[1]} ${m[2]} × ${m[3]} = ${brl(pn(l.valor))}` : `   ${l.desc || "Valor"}: ${brl(pn(l.valor))}`;
-    if (ab < pn(l.valor) - 0.005) t += ` (já pago ${brl(pn(l.valor) - ab)}, falta ${brl(ab)})`; return t; };
   sortedOps().filter(o => !pendente(o)).reverse().forEach(o => { const g = secsDe(o.id); if (g.tot <= 0.005) return; tot += g.tot;
-    const ls = S.lanc.filter(l => l.tipo !== "recebimento" && l.opId === o.id && pn(l.valor) - (S.F.map[l.id]?.pago || 0) > 0.005);
-    blocos.push(`*${opCode(o)} · ${produto(o.produtoId)?.nome || ""}*\n` + g.secs.map(x => { const lx = ls.filter(l => secaoDe(l) === x.key); return `▸ ${nomeSec(x.key)}\n` + lx.map(linha).join("\n") + (lx.length > 1 ? `\n   Total ${nomeSec(x.key).toLowerCase()}: ${brl(x.ab)}` : ""); }).join("\n")); });
+    blocos.push(`*${opCode(o)} · ${produto(o.produtoId)?.nome || ""}*\n` + g.secs.map(x => `• ${nomeSec(x.key)}: ${brl(x.ab)}`).join("\n")); });
   const ger = S.lanc.filter(l => l.tipo !== "recebimento" && !l.opId).map(l => ({l, ab: pn(l.valor) - (S.F.map[l.id]?.pago || 0)})).filter(x => x.ab > 0.005);
   if (ger.length){ const t = sum(ger, x => x.ab); tot += t; blocos.push(`*Serviços gerais*\n` + ger.map(x => `• ${x.l.desc || "Serviço"}: ${brl(x.ab)}`).join("\n")); }
   const fim = proxSabado(), ini = (() => { const d = new Date(fim + "T12:00:00"); d.setDate(d.getDate() - 6); return d.toISOString().slice(0,10); })(), dm = x => fdate(x).slice(0,5);
@@ -1637,7 +1632,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 75;
+const APP_V = 76;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
