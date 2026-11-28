@@ -254,7 +254,7 @@ h1{font-family:var(--font-display);font-weight:800;font-size:26px} h2{font-famil
 .how div::before{counter-increment:h;content:counter(h);width:26px;height:26px;border-radius:50%;border:1px solid var(--accent);color:var(--accent);display:grid;place-items:center;font-weight:700;font-size:13px}
 .ext{display:grid;grid-template-columns:52px 1fr auto;gap:2px 10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
 .ext:last-child{border-bottom:0}
-.ext .aloc{grid-column:1/-1;margin:6px 0 2px;padding:8px 10px;border-radius:10px;background:rgba(122,170,110,.08);border:1px solid rgba(122,170,110,.25);display:flex;flex-direction:column;gap:3px}
+.ext .aloc{grid-column:1/-1;margin:6px 0 2px;padding:8px 10px;border-radius:10px;background:rgba(122,170,110,.08);border:1px solid rgba(122,170,110,.25)}.aloc summary{cursor:pointer;color:var(--ok);font-weight:600;list-style:none}.aloc summary::-webkit-details-marker{display:none}.alocl{display:flex;flex-direction:column;gap:3px;margin-top:6px}.prevaloc{margin:4px 0 10px;padding:10px 12px;border-radius:10px;background:rgba(122,170,110,.08);border:1px solid rgba(122,170,110,.25)}
 .ext .d{font-size:12px;color:var(--muted)}
 .ext .v{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
 .ext .v.pg{color:var(--ok)}.ext .v.ab{color:var(--muted)}.ext .sl.pg{color:var(--ok)}.ext .sl.tag{justify-self:end;align-self:start;padding:2px 9px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.03);font-size:12px;color:var(--muted);white-space:nowrap}.ext .sl.tag.pg{border-color:rgba(143,174,107,.45);background:rgba(143,174,107,.1);color:var(--ok)}
@@ -1137,8 +1137,11 @@ function contaHtml(ls, opId){
 }
 function alocHtml(rid){
   const a = S.F.aloc?.[rid]; if (!a || !a.length) return "";
+  return `<details class="aloc"><summary class="small">Ver para o que foi este pagamento ▾</summary>${alocLista(a)}</details>`;
+}
+function alocLista(a){
   const g = {}; a.forEach(x => { const nomeSec = (SECOES.find(s => s[0] === x.sec) || [0, x.sec])[1]; const k = (x.op ? opCode(opById(x.op)) : "Geral") + " · " + (nomeSec === "Outros serviços" ? "Serviços" : nomeSec); g[k] = (g[k] || 0) + x.x; });
-  return `<div class="aloc"><div class="small muted">Este pagamento foi para:</div>${Object.entries(g).map(([k,v]) => `<div class="row between small"><span>${esc(k)}</span><span>${brl(v)}</span></div>`).join("")}</div>`;
+  return `<div class="alocl">${Object.entries(g).map(([k,v]) => `<div class="row between small"><span>${esc(k)}</span><span>${brl(v)}</span></div>`).join("")}</div>`;
 }
 function extratoHtml(ls){
   const ord = [...ls].sort((a,b) => (a.data||"").localeCompare(b.data||"") || (a.criadoEm||"").localeCompare(b.criadoEm||""));
@@ -1160,7 +1163,7 @@ function viewFinanceiro(){
   const btns = adm() ? `<div class="row"><button class="btn" data-novo="recebimento">+ Pagamento</button><button class="btn" data-novo="despesa">+ Serviço</button></div>` : ed ? `<button class="btn pri" data-novo="recebimento">Comprovante de pagamento</button>` : "";
   return `<div class="row between"><h1>Extrato</h1>${btns}</div>
   <div class="field"><label for="finop">Mostrar</label><select id="finop"><option value="todas">Tudo (histórico completo)</option><option value="aberto" ${fo==="aberto"?"selected":""}>Só pedidos em aberto</option><option value="geral" ${fo==="geral"?"selected":""}>Serviços gerais (sem pedido)</option>${sortedOps().map(o=>`<option value="${esc(o.id)}" ${fo===o.id?"selected":""}>${opCode(o)} · ${esc(produto(o.produtoId)?.nome||"")}</option>`).join("")}</select></div>
-  ${adm() ? `<details class="card"><summary class="sumrow"><span class="lbl">Resumo por etapa · registrar pagamentos</span><span class="small gold">ver ▾</span></summary>${contaHtml(ls, opIdF)}</details>` : ""}
+  ${adm() ? `<details class="card" style="padding:10px 14px"><summary class="sumrow"><span class="small">Resumo por etapa</span><span class="small gold">ver ▾</span></summary>${contaHtml(ls, opIdF)}</details>` : ""}
   ${extratoHtml(ls) || `<div class="empty">Nada lançado.</div>`}
   ${adm() && fo !== "aberto" ? `<div class="card"><h2>Pagamentos da Thaty</h2>${recs.length ? recs.map(lancRow).join("") : `<div class="small muted">Nenhum pagamento lançado.</div>`}</div>` : ""}
   ${adm() && fo === "todas" ? oficinasResumo(S.ops.map(o => ({o, k:calc(o)}))) : ""}`;
@@ -1265,7 +1268,7 @@ function lancForm(tipo, l, opIdDefault, extra0 = {}){
   const titles = {cobranca:"cobrança", despesa:"serviço", recebimento:"pagamento"};
   const fields = [
     {name:"opId",label:"Pedido",type:"select",full:true,value:l?.opId ?? opIdDefault ?? "",options:[{v:"",t:"Geral (sem pedido)"}, ...sortedOps().map(o=>({v:o.id,t:`${opCode(o)} · ${produto(o.produtoId)?.nome||""}`}))]},
-    ...(tipo === "recebimento" ? [{name:"secao",label:"Sessão",type:"select",full:true,value:l?.secao||extra0.secao||"Tecido",options:SECOES.map(([v,t])=>({v,t}))}] : []),
+    ...(tipo === "recebimento" ? [{name:"secao",label:"Para qual etapa",type:"select",full:true,value:l ? (l.secao||"") : (extra0.secao||""),options:[{v:"",t:"Automático · quita as mais antigas primeiro"}, ...SECOES.map(([v,t])=>({v,t}))]}] : []),
     ...(tipo !== "recebimento" ? [{name:"cat",label:tipo==="despesa"?"Tipo de gasto":"Etapa",type:"select",value:l?.cat||cats[0],options:cats.map(c=>({v:c,t:c}))}] : []),
     {name:"data",label:"Data",type:"date",value:l?.data||today()},
     ...(tipo === "despesa"
@@ -1276,7 +1279,7 @@ function lancForm(tipo, l, opIdDefault, extra0 = {}){
   ];
   fields.push({name:"arquivo",label:l?.anexo?"Trocar comprovante (opcional)":tipo==="despesa"?"Comprovante (print da corrida, nota, risco)":"Comprovante (opcional)",type:"file",hint:"Foto ou PDF, até 15 MB."});
   form({title:(novo?"Novo ":"Editar ")+titles[tipo], fields,
-    live: tipo === "despesa" ? v => `<div class="calcbox"><span>${fmt(v.qtd||0)} × ${brl(v.un||0)}</span><b style="font-size:20px">Total ${brl((v.qtd||0)*(v.un||0))}</b></div>` : null,
+    live: tipo === "recebimento" ? v => prevAloc(v, l) : tipo === "despesa" ? v => `<div class="calcbox"><span>${fmt(v.qtd||0)} × ${brl(v.un||0)}</span><b style="font-size:20px">Total ${brl((v.qtd||0)*(v.un||0))}</b></div>` : null,
     extra: (l?.anexo ? `<div class="row small">Anexo atual: ${anexoHtml(l.anexo)}</div>` : "") + (!novo ? `<button class="btn danger sm" id="dell" type="button">Excluir lançamento</button>` : ""),
     saveLabel: novo ? "Lançar" : "Salvar",
     onSave: async v => {
@@ -1294,6 +1297,15 @@ function lancForm(tipo, l, opIdDefault, extra0 = {}){
   if (tipo === "despesa" && fc && fv && !l){ let ult = fv.value; fc.addEventListener("change", () => { const p = padraoServ(fc.value); if (!fv.value || fv.value === ult){ fv.value = p ? String(p).replace(".",",") : ""; ult = fv.value; fv.dispatchEvent(new Event("input",{bubbles:true})); } }); }
 }
 const padraoServ = () => 0;
+// prévia: simula o pagamento e mostra para onde ele vai antes de salvar
+function prevAloc(v, l){
+  const val = pn(v.valor); if (val <= 0.005) return "";
+  const fake = {id:"__prev", tipo:"recebimento", opId:v.opId||"", secao:v.secao||"", data:v.data||today(), valor:val, criadoEm:"9999"};
+  const bak = S.lanc; S.lanc = [...bak.filter(x => !l || x.id !== l.id), fake];
+  let F; try { F = finance(); } finally { S.lanc = bak; }
+  const a = F.aloc["__prev"] || [], usado = sum(a, x => x.x), sobra = val - usado;
+  return `<div class="prevaloc"><div class="small muted">Este pagamento vai quitar:</div>${a.length ? alocLista(a) : `<div class="small">nada em aberto${v.secao ? " nessa etapa" : ""}</div>`}${sobra > 0.005 ? `<div class="row between small" style="margin-top:4px"><span>Fica de crédito para ela</span><span>${brl(sobra)}</span></div>` : ""}</div>`;
+}
 
 function viewOrcamento(){
   const p = produto(S.orc.prod) || S.produtos[0]; const q = pn(S.orc.qtd);
@@ -1663,7 +1675,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 92;
+const APP_V = 93;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
