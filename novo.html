@@ -1367,7 +1367,8 @@ function msgCobranca(){
     blocos.push(`*${opCode(o)} · ${produto(o.produtoId)?.nome || ""}*\n` + g.secs.map(x => `• ${nomeSec(x.key)}: ${brl(x.ab)}`).join("\n")); });
   const ger = S.lanc.filter(l => l.tipo !== "recebimento" && !l.opId).map(l => ({l, ab: pn(l.valor) - (S.F.map[l.id]?.pago || 0)})).filter(x => x.ab > 0.005);
   if (ger.length){ const t = sum(ger, x => x.ab); tot += t; blocos.push(`*Serviços gerais*\n` + ger.map(x => `• ${x.l.desc || "Serviço"}: ${brl(x.ab)}`).join("\n")); }
-  return `Oi, Thaty! Segue o que está em aberto da produção:\n\n${blocos.join("\n\n")}\n\n*Total: ${brl(tot)}*\nPagamento até sábado, ${fdate(proxSabado())}.\n\nPix: ${PIX.chave}\n${PIX.banco} · ${PIX.nome}\n\nDepois é só mandar o comprovante pelo app. Obrigado! 🙏`;
+  const fim = proxSabado(), ini = (() => { const d = new Date(fim + "T12:00:00"); d.setDate(d.getDate() - 6); return d.toISOString().slice(0,10); })(), dm = x => fdate(x).slice(0,5);
+  return `Oi, Thaty! Segue o que está em aberto referente a esta semana (${dm(ini)} a ${dm(fim)}):\n\n${blocos.join("\n\n")}\n\n*Total: ${brl(tot)}*\nPagamento até sábado, ${fdate(proxSabado())}.\n\nPix: ${PIX.chave}\n${PIX.banco} · ${PIX.nome}\n\nDepois é só mandar o comprovante pelo app. Obrigado! 🙏`;
 }
 function viewCadastros(){
   if (!ehManuel() || S.sub === "insumos") S.sub = "produtos";
@@ -1631,7 +1632,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 70;
+const APP_V = 71;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
