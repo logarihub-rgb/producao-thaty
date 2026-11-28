@@ -291,7 +291,8 @@ details.card[open] .sumrow .gold:last-child{opacity:.6}
 details.ent>summary{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border:1px solid #c9a35a;border-radius:14px;background:rgba(201,163,90,.10);color:var(--text,#eee);font-size:15px;font-weight:600;margin-top:6px}
 details.ent>summary::before{content:none}details.ent>summary::-webkit-details-marker{display:none}
 details.ent>summary .entv{color:#c9a35a;font-size:13px}details.ent>summary .entv::after{content:"ver ▾"}details.ent[open]>summary .entv::after{content:"fechar ▴"}
-.paylbl{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#c9a35a;margin:4px 0 -2px}
+.paylbl{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#c9a35a;margin:4px 0 -2px}.paylbl.pay{color:var(--ok)}
+.flow.pay .fs.done i{background:var(--ok);border-color:var(--ok);color:#14120e}.flow.pay .fs.done:not(:last-child)::after{background:var(--ok)}.flow.pay .fs.now i{border-color:var(--ok);color:var(--ok);background:#1d2318}.flow.pay .fs.now b{color:var(--ok)}
 .btn.big-cta2{width:100%;padding:14px;border:1.5px solid #c9a35a;background:rgba(201,163,90,.12);color:#e9cf98;font-weight:700;font-size:15px;border-radius:12px}
 html,body{overflow-x:hidden;max-width:100%}
 #who{max-width:42vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -826,7 +827,7 @@ function pagFlow(op){
   const et0 = g.todas.map(x => x.key === "Servicos" ? {...x, v: x.v + gv, ab: x.ab + gab, ger: gv > 0.005} : x);
   const etapas = [...et0.filter(x => x.key === "Servicos"), ...et0.filter(x => x.key !== "Servicos")]; // Serviços gerais primeiro
   const serv = S.lanc.filter(l => l.tipo !== "recebimento" && l.opId === op.id && secaoDe(l) === "Servicos");
-  return `<div class="paylbl">Pagamentos · ${opCode(op)}</div><div class="flow ${etapas.length > 4 ? "f5" : ""}">${etapas.map((x, ix) => { const ret = x.key === "Tecido" && op.retalho && x.v <= 0.005; const pagoAte = (ix === 0 ? etapas.slice(1, 2) : etapas.slice(0, ix)).every(y => (y.key === "Tecido" && op.retalho && y.v <= 0.005) || (y.v > 0.005 && y.ab <= 0.005));
+  return `<div class="paylbl pay">Pagamentos · ${opCode(op)}</div><div class="flow pay ${etapas.length > 4 ? "f5" : ""}">${etapas.map((x, ix) => { const ret = x.key === "Tecido" && op.retalho && x.v <= 0.005; const pagoAte = (ix === 0 ? etapas.slice(1, 2) : etapas.slice(0, ix)).every(y => (y.key === "Tecido" && op.retalho && y.v <= 0.005) || (y.v > 0.005 && y.ab <= 0.005));
       const semServ = x.key === "Servicos" && x.v <= 0.005 && pagoAte; const st = ret || semServ ? "done" : x.v <= 0.005 ? "" : x.ab > 0.005 ? "now" : "done";
     return `<div class="fs ${st}"><i>$</i><b>${x.nome === "Outros serviços" ? "Serviços gerais" : x.nome}</b><small>${ret ? "retalho ✓" : semServ ? "nenhum ✓" : !st ? (x.key === "Servicos" ? "nenhum" : "a lançar") : st === "done" ? "pago ✓" : brl(x.ab)}</small></div>`; }).join("")}</div>
     ${serv.map(l => { const a = pn(l.valor) - (S.F.map[l.id]?.pago || 0); return `<div class="row between small"><span>${esc(l.desc || "Serviço")} <span class="muted">· ${opCode(op)}</span></span><span>${a > 0.005 ? brl(a) : "pago ✓"}</span></div>`; }).join("")}`;
@@ -1317,7 +1318,7 @@ function viewProdutosThaty(){
     return op ? cardPeca(op, true) : `<div class="card"><div class="lbl">${esc(p.nome)} · custo por peça</div><div class="small muted">Ainda sem produção deste modelo. O valor aparece depois do primeiro corte.</div>${adm() ? `<button class="btn sm pri" data-prod="${esc(p.id)}" style="margin-top:10px;align-self:flex-start">✏️ Editar produto</button>` : ""}</div>`; });
   return `<div class="row between"><h1>Produtos</h1>${adm() ? `<button class="btn pri sm" id="newprod">+ Novo produto</button>` : ""}</div><div class="small muted" style="margin:-4px 0 10px">Toque em um modelo para ver a conta: tecido, corte, costura e assessoria.</div>${cards.join("") || `<div class="empty">Nenhum produto cadastrado.</div>`}`;
 }
-function mascote(cl){return`<svg viewBox="0 0 100 100" ${cl?`class="${cl}"`:""} aria-hidden="true"><circle cx="50" cy="50" r="48" fill="#1d1a14" stroke="#c9a24d" stroke-width="4"/><line x1="50" y1="14" x2="50" y2="24" stroke="#c9a24d" stroke-width="3"/><circle cx="50" cy="12" r="4.5" fill="#f0c95c"/><rect x="24" y="24" width="52" height="42" rx="14" fill="#c9a24d"/><rect x="31" y="32" width="38" height="24" rx="9" fill="#14120e"/><circle cx="42" cy="44" r="5" fill="#7fe3c4"/><circle cx="58" cy="44" r="5" fill="#7fe3c4"/><path d="M44 51 Q50 55 56 51" stroke="#7fe3c4" stroke-width="2.2" fill="none" stroke-linecap="round"/><path d="M30 70 h40 l-4 14 h-32z" fill="#c9a24d"/><path d="M42 72 L50 82 L58 72" stroke="#14120e" stroke-width="3" fill="none"/></svg>`}
+function mascote(cl){return`<svg viewBox="0 0 100 100" ${cl?`class="${cl}"`:""} aria-hidden="true"><circle cx="50" cy="50" r="48" fill="#1d1a14" stroke="#c9a24d" stroke-width="4"/><line x1="50" y1="14" x2="50" y2="24" stroke="#c9a24d" stroke-width="3"/><circle cx="50" cy="12" r="4.5" fill="#f0c95c"/><rect x="24" y="24" width="52" height="42" rx="14" fill="#c9a24d"/><rect x="31" y="32" width="38" height="24" rx="9" fill="#14120e"/><circle cx="42" cy="44" r="5" fill="#8fae6b"/><circle cx="58" cy="44" r="5" fill="#8fae6b"/><path d="M44 51 Q50 55 56 51" stroke="#8fae6b" stroke-width="2.2" fill="none" stroke-linecap="round"/><path d="M30 70 h40 l-4 14 h-32z" fill="#c9a24d"/><path d="M42 72 L50 82 L58 72" stroke="#14120e" stroke-width="3" fill="none"/></svg>`}
 /* ---------- ASSISTENTE (responde na hora com os dados do app, sem IA paga) ---------- */
 let CH = null, OUVINDO = false, REC = null, VOZ = false;
 const nrm = x => String(x||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -1659,7 +1660,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 85;
+const APP_V = 86;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
