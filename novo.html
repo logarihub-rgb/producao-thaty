@@ -464,16 +464,19 @@ function calc(op){
   const entregueCliente = costurado;
   const tecidoOk = op.retalho || pn(op.kg) > 0;
   // etapas: tecido, corte, costura (entrega da oficina = entrega para a Thaty), finalizado
-  const etapa = [tecidoOk ? 2 : 0, cortado >= qtd && qtd ? 2 : cortado ? 1 : 0, costurado >= qtd && qtd ? 2 : enviado ? 1 : 0, op.concluida || (qtd && costurado >= qtd) ? 2 : 0];
+  // depois do corte, a meta de costura e entrega passa a ser o que saiu do corte (não o pedido)
+  const alvo = pecasReais;
+  const corteOk = cortado > 0 && (cortado >= qtd || enviado > 0);
+  const etapa = [tecidoOk ? 2 : 0, corteOk ? 2 : cortado ? 1 : 0, costurado >= alvo && alvo ? 2 : enviado ? 1 : 0, op.concluida || (alvo && costurado >= alvo) ? 2 : 0];
   let st = 0, stLabel = "Aguardando tecido";
-  if (op.concluida || (qtd && costurado >= qtd)){ st = 3; stLabel = "Entregue"; }
+  if (op.concluida || (alvo && costurado >= alvo)){ st = 3; stLabel = "Entregue"; }
   else if (costurado){ st = 2; stLabel = "Entregando"; }
   else if (enviado){ st = 2; stLabel = "Na costura"; }
-  else if (cortado){ st = 1; stLabel = cortado >= qtd ? "Cortado" : "No corte"; }
+  else if (cortado){ st = 1; stLabel = corteOk ? "Cortado" : "No corte"; }
   else if (tecidoOk){ st = 1; stLabel = "Tecido comprado"; }
   return {
-    prod, qtd, custoTecido, porItem, realUn, realTotal:realUn*qtd, estUn:custoProduto(prod),
-    pecasRolo: pn(op.rolos) ? qtd / pn(op.rolos) : null, assessoria: qtd * S.cfg.assessoria,
+    prod, qtd: alvo, pedido: qtd, custoTecido, porItem, realUn, realTotal:realUn*alvo, estUn:custoProduto(prod),
+    pecasRolo: pn(op.rolos) ? alvo / pn(op.rolos) : null, assessoria: alvo * S.cfg.assessoria,
     cortado, aCortar:Math.max(0,qtd-cortado), corteUn, corteTotal:qtd*corteUn, cortePago, corteAPagar:Math.max(0, cortado*corteUn - cortePago),
     partes, enviado, aEnviar:Math.max(0, cortado-enviado), costurado, naCostura:Math.max(0, enviado-costurado),
     entregueCliente,
@@ -594,7 +597,7 @@ function fluxo(op, k){
   const done = [k.etapa[0] === 2, q && k.cortado >= q, q && k.enviado >= q, op.concluida || (q && k.costurado >= q)];
   const cur = done.findIndex(d => !d);
   const subs = [op.retalho ? "retalho" : pn(op.kg) ? fmt(pn(op.kg),0)+" kg" : "falta",
-    `${fmt(k.cortado)}/${fmt(q)}`, `${fmt(k.enviado)}/${fmt(q)}`, `${fmt(k.costurado)}/${fmt(q)}`];
+    k.cortado > 0 ? `${fmt(k.cortado)} pç` : `0/${fmt(k.pedido)}`, `${fmt(k.enviado)}/${fmt(q)}`, `${fmt(k.costurado)}/${fmt(q)}`];
   const nomes = ["Tecido","Corte","Costura","Entregue"];
   const html = `<div class="flow f5"><div class="fs done"><i>✓</i><b>Pedido</b><small>aceito</small></div>${nomes.map((n,i)=>`<div class="fs ${done[i]?"done":i===cur?"now":""}"><i>${done[i]?"✓":i+2}</i><b>${n}</b><small>${subs[i]}</small></div>`).join("")}</div>`;
   let nx, ok = false;
@@ -623,7 +626,7 @@ function fimOp(op, k){
 function opCard(op){
   const k = calc(op); const f = finOp(op.id, S.F); const fl = fluxo(op, k);
   return `<button class="op" data-op="${esc(op.id)}">
-    <div class="row between"><div class="row" style="gap:8px"><span class="code">${opCode(op)}</span><div><b>${esc(k.prod?.nome || "Produto removido")}</b><div class="small muted">${fmt(k.qtd)} peças</div><div class="small muted">Início ${fdate(op.data)} · ${fimOp(op, k)}</div></div></div></div>
+    <div class="row between"><div class="row" style="gap:8px"><span class="code">${opCode(op)}</span><div><b>${esc(k.prod?.nome || "Produto removido")}</b><div class="small muted">${k.cortado > 0 && k.cortado !== k.pedido ? `Pedido ${fmt(k.pedido)} · saíram ${fmt(k.cortado)} no corte` : `${fmt(k.pedido)} peças`}</div><div class="small muted">Início ${fdate(op.data)} · ${fimOp(op, k)}</div></div></div></div>
     ${pendente(op) ? "" : `<div class="paylbl">Produção · ${opCode(op)}</div>`}${fl.html}${pendente(op) ? fl.next : ""}
     ${pendente(op) ? "" : pagFlow(op)}
     ${pendente(op) ? `<div class="row between small"><span class="muted">Cores</span><b>${esc((op.obs||"").replace(/^Cores: /,"").split(" · ").slice(0,4).join(" · "))}</b></div>` : `<div class="row between small"><span class="muted">${f.aberto>0.005?"Falta pagar deste pedido":"Pedido pago"}</span><b class="num" style="color:${f.aberto>0.005?"var(--warn)":"var(--ok)"}">${f.aberto>0.005?brl(f.aberto):"✓"}</b></div>`}
@@ -1043,7 +1046,7 @@ function viewOp(id){
   const num = i => i < fl.cur || fl.cur < 0 ? "✓" : i+1;
   return `<div class="row"><button class="btn ghost" data-back>← Pedidos</button></div>
   <div><h1>${opCode(op)} · ${esc(k.prod?.nome||"Produto removido")}</h1>
-    <div class="muted small">${fmt(q)} peças · início ${fdate(op.data)}${op.dataFinal?` · final ${fdate(op.dataFinal)}`:""}${op.obs?` · ${esc(op.obs)}`:""}</div></div>
+    <div class="muted small">${k.cortado > 0 && k.cortado !== k.pedido ? `Pedido ${fmt(k.pedido)} · saíram ${fmt(k.cortado)} no corte` : `${fmt(k.pedido)} peças`} · início ${fdate(op.data)}${op.dataFinal?` · final ${fdate(op.dataFinal)}`:""}${op.obs?` · ${esc(op.obs)}`:""}</div></div>
   <div class="card">${fl.html}${fl.next}
     ${adm() && !pendente(op) ? `<button class="btn" style="width:100%" data-rolostec="${esc(op.id)}">🧵 ${(op.rolosTec||[]).length ? `Rolos do app Tecido: ${op.rolosTec.length} (${fmt(sum(op.rolosTec, r => r.kg),2)} kg) · alterar` : "Escolher rolos do app Tecido"}</button>` : ""}
     ${(op.rolosTec||[]).length ? `<div class="small muted">${Object.entries(op.rolosTec.reduce((m,r) => (m[r.cor] = (m[r.cor]||0) + 1, m), {})).map(([c,n]) => `${c} ${n}`).join(" · ")}</div>` : ""}
@@ -1057,7 +1060,7 @@ function viewOp(id){
     </div></div>
 
     <div class="step ${cls(1)}"><i>${num(1)}</i><div><div class="row between"><h2>Corte</h2>${ed?`<button class="btn sm ghost" id="editcorte">${esc(c.local||"Cortador")} · ${brl(k.corteUn)}/pç ✎</button>`:`<span class="small muted">${esc(c.local||"")}</span>`}</div>
-      <div class="row between small"><span><b>${fmt(k.cortado)}</b> de ${fmt(q)} cortadas</span>${k.aCortar?`<span class="muted">faltam ${fmt(k.aCortar)}</span>`:""}</div>${bar(k.cortado,q)}
+      <div class="row between small"><span><b>${fmt(k.cortado)}</b> cortadas · pedido ${fmt(k.pedido)}</span>${k.aCortar?`<span class="muted">faltam ${fmt(k.aCortar)}</span>`:""}</div>${bar(k.cortado,q)}
       <div class="row">${ed && k.aCortar ? `<button class="btn sm pri" data-add="ce|">+ Chegou do corte</button>` : ""}${ed ? `<button class="btn sm" id="pdfcorte">📄 Ler PDF do corte</button>` : ""}</div>
       ${corHtml(op)}
       <details class="mini"><summary>Entregas do corte (${(c.entregas||[]).length})</summary>${hist(c.entregas,"ce","")}${ed && !k.aCortar ? `<button class="btn sm" data-add="ce|">+ Entrega</button>` : ""}</details>
@@ -1532,7 +1535,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 67;
+const APP_V = 68;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
