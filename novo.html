@@ -1176,6 +1176,7 @@ async function tecCompras(silencioso){
   const d = j.data; const lista = [...(d.vendas||[]), ...((d.inv && d.inv.retiradas)||[])];
   // para o lucro: todas as vendas da Thaty (inclusive as antigas, sem rolos) + retiradas com rolos (as outras espelham uma venda)
   S._tecCompras = [...(d.vendas||[]), ...((d.inv && d.inv.retiradas)||[]).filter(v => (v.rolos||[]).length)].filter(v => /tha|tati|taty/i.test(v.cliente||""));
+  try { localStorage.setItem("pt_tec_luc", JSON.stringify(S._tecCompras.map(v => ({tipo:v.tipo, aba:v.aba, linha:v.linha, valorReal:v.valorReal, estimado:v.estimado, frete:v.frete, recebido:v.recebido, pago:v.pago, lucro:v.lucro, cliente:v.cliente})))); } catch(e){}
   return lista.filter(v => /tha|tati|taty/i.test(v.cliente||"") && (v.rolos||[]).length).sort((a,b) => (b.data||"").localeCompare(a.data||""));
 }
 // lucro do tecido só na parte já paga pela Thaty
@@ -1189,6 +1190,8 @@ function lucroCard(){
   // lucro do Manuel com a Thaty: tecido (lucro das vendas no app Tecido) + assessoria — separado em recebido e a receber
   const as = S.lanc.filter(l => l.tipo === "cobranca" && secaoDe(l) === "Assessoria");
   const assP = sum(as, l => S.F.map[l.id]?.pago || 0), assA = sum(as, l => pn(l.valor)) - assP;
+  // abre na hora com o último valor salvo; ao abrir o app, o syncPagTecido confere no app Tecido e atualiza
+  if (!S._tecCompras){ try { S._tecCompras = JSON.parse(localStorage.getItem("pt_tec_luc") || "null"); } catch(e){} }
   const ok = !!S._tecCompras, tecP = ok ? tecLucroPago(S._tecCompras) : 0, tecA = ok ? tecLucroPago(S._tecCompras, true) : 0;
   const tv = v => ok ? brl(v) : `<button class="btn ghost sm" data-tecluc>carregar</button>`;
   return `<div class="card"><div class="lbl">Seu lucro com a Thaty</div>
@@ -1660,7 +1663,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 89;
+const APP_V = 90;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
