@@ -257,7 +257,7 @@ h1{font-family:var(--font-display);font-weight:800;font-size:26px} h2{font-famil
 .ext .aloc{grid-column:1/-1;margin:6px 0 2px;padding:8px 10px;border-radius:10px;background:rgba(122,170,110,.08);border:1px solid rgba(122,170,110,.25);display:flex;flex-direction:column;gap:3px}
 .ext .d{font-size:12px;color:var(--muted)}
 .ext .v{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
-.ext .v.pg{color:var(--ok)}
+.ext .v.pg{color:var(--ok)}.ext .v.ab{color:var(--muted)}.ext .sl.pg{color:var(--ok)}
 .ext .sl{grid-column:3;text-align:right;font-size:11px;color:var(--muted)}
 .ext .ds{grid-column:2;font-size:12px;color:var(--muted)}
 .welcome{font-size:13px;color:var(--muted)} .welcome b{color:var(--pink)}
@@ -1146,7 +1146,7 @@ function extratoHtml(ls){
   if (!rows.length) return "";
   const lim = S.extTodos ? rows : rows.slice(0, 25);
   return `<div class="card"><h2>Extrato</h2><div class="small muted">Tudo o que aconteceu, do mais recente para o mais antigo.</div><div>
-    ${lim.map(({l,rec,saldo}) => `<div class="ext"><span class="d">${fdate(l.data).slice(0,5)}</span><span><b>${rec ? "Pagamento recebido ✓" : esc(l.cat || "Serviço")}</b> <span class="small muted">· ${opCode(opById(l.opId))}</span></span><span class="v ${rec?"pg":""}">${rec?"− ":""}${brl(pn(l.valor))}</span><span class="ds">${esc(l.desc||"")}</span>${rec ? alocHtml(l.id) : ""}</div>`).join("")}
+    ${lim.map(({l,rec,saldo}) => `<div class="ext"><span class="d">${fdate(l.data).slice(0,5)}</span><span><b>${rec ? "Pagamento recebido ✓" : esc(l.cat || "Serviço")}</b> <span class="small muted">· ${opCode(opById(l.opId))}</span></span><span class="v ${rec || S.F.map[l.id]?.st === "pago" ? "pg" : "ab"}">${rec?"− ":""}${brl(pn(l.valor))}</span><span class="ds">${esc(l.desc||"")}</span>${rec ? "" : (() => { const m = S.F.map[l.id] || {}, st = m.st; return st === "pago" ? `<span class="sl pg">pago ✓</span>` : st === "parcial" ? `<span class="sl">a pagar ${brl(pn(l.valor) - (m.pago||0))}</span>` : `<span class="sl">a pagar</span>`; })()}${rec ? alocHtml(l.id) : ""}</div>`).join("")}
   </div>${rows.length > lim.length ? `<button class="btn sm" id="extall">Ver todos (${rows.length})</button>` : ""}</div>`;
 }
 function viewFinanceiro(){
@@ -1663,7 +1663,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 90;
+const APP_V = 91;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
