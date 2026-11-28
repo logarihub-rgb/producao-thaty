@@ -1191,15 +1191,14 @@ function lucroCard(){
   const ok = !!S._tecCompras, tecP = ok ? tecLucroPago(S._tecCompras) : 0, tecA = ok ? tecLucroPago(S._tecCompras, true) : 0;
   const tv = v => ok ? brl(v) : `<button class="btn ghost sm" data-tecluc>carregar</button>`;
   return `<div class="card"><div class="lbl">Seu lucro com a Thaty</div>
-    <div class="small muted" style="margin-top:2px">Já recebido</div>
-    <div class="ln"><span>Tecido</span><span class="v">${tv(tecP)}</span></div>
-    <div class="ln"><span>Assessoria</span><span class="v">${brl(assP)}</span></div>
-    <div class="ln tot"><span>Lucro recebido</span><span class="v" style="color:var(--ok)">${brl(assP + tecP)}</span></div>
-    <div class="small muted" style="margin-top:8px">A receber (estimativa)</div>
+    <div class="small muted" style="margin-top:2px">Total</div>
+    <div class="ln"><span>Tecido</span><span class="v">${tv(tecP + tecA)}</span></div>
+    <div class="ln"><span>Assessoria</span><span class="v">${brl(assP + assA)}</span></div>
+    <div class="ln tot"><span>Lucro total</span><span class="v" style="color:var(--ok)">${brl(assP + tecP + assA + tecA)}</span></div>
+    <div class="small muted" style="margin-top:8px">A receber</div>
     <div class="ln"><span>Tecido</span><span class="v">${tv(tecA)}</span></div>
     <div class="ln"><span>Assessoria</span><span class="v">${brl(assA)}</span></div>
-    <div class="ln tot"><span>Lucro a receber</span><span class="v gold">${brl(assA + tecA)}</span></div>
-    <div class="ln"><span><b>Lucro previsto total</b></span><span class="v"><b>${brl(assP + tecP + assA + tecA)}</b></span></div></div>`;
+    <div class="ln tot"><span>Lucro a receber</span><span class="v gold">${brl(assA + tecA)}</span></div></div>`;
 }
 function syncPagTecido(){
   if (!adm() || S._tecSync) return; S._tecSync = true;
@@ -1660,7 +1659,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 83;
+const APP_V = 84;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
