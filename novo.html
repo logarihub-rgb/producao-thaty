@@ -297,6 +297,7 @@ html,body{overflow-x:hidden;max-width:100%}
 #who{max-width:42vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .flow .fs{min-width:0}.flow .fs small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}.flow .fs b{white-space:normal;line-height:1.15;text-align:center;letter-spacing:-.2px}
 .insrow{display:grid;grid-template-columns:2fr 1fr .8fr 1fr auto;gap:6px;align-items:center}.insrow input{min-width:0;width:100%;background:var(--bg);border:1px solid var(--line);color:inherit;border-radius:8px;padding:8px}.insrow.insh{margin-bottom:-4px}
+.corbox{margin-top:8px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;gap:4px}
 </style>
 </head>
 <body>
@@ -905,6 +906,77 @@ function oficinasResumo(all){
   return `<div class="card"><h2>Você paga: cortador e oficinas</h2><div class="tbl-wrap"><table><thead><tr><th>Quem</th><th class="r">Peças com eles</th><th class="r">A pagar</th></tr></thead><tbody>
   ${rows.map(r=>`<tr><td>${esc(r.n)} <span class="small muted">· ${r.tipo}</span></td><td class="r">${fmt(r.pend)}</td><td class="r">${brl(r.aPagar)}</td></tr>`).join("")}</tbody></table></div></div>`;
 }
+/* ---------- corte por cor (PDF do cortador) ---------- */
+const corCanon = c => { const u = String(c||"").trim().toUpperCase(); const m = {VERMELHO:"Rubi", RUBI:"Rubi", OFF:"Off", "OFF WHITE":"Off", MARFIM:"Off", PRETO:"Preto", MARROM:"Marrom", BRANCO:"Branco"}; return m[u] || (u.charAt(0) + u.slice(1).toLowerCase()); };
+const porCorCorte = op => { const m = {}; ((op.corte||{}).entregas||[]).forEach(e => (e.porCor||[]).forEach(x => m[x.cor] = (m[x.cor]||0) + pn(x.qtd))); return m; };
+const porCorCostura = op => { const m = {}; (op.costuras||[]).forEach(t => (t.entregas||[]).forEach(e => (e.porCor||[]).forEach(x => m[x.cor] = (m[x.cor]||0) + pn(x.qtd)))); return m; };
+let _pdfjs;
+async function pdfTexto(file){
+  if (!_pdfjs){ await new Promise((ok, err) => { const sc = document.createElement("script"); sc.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"; sc.onload = ok; sc.onerror = () => err("Sem internet para ler o PDF."); document.head.appendChild(sc); });
+    _pdfjs = window.pdfjsLib; _pdfjs.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"; }
+  const doc = await _pdfjs.getDocument({data: await file.arrayBuffer()}).promise; const linhas = [];
+  for (let i = 1; i <= doc.numPages; i++){ const tc = await (await doc.getPage(i)).getTextContent(); const rows = {};
+    tc.items.forEach(it => { const y = Math.round(it.transform[5] / 3); (rows[y] ||= []).push(it); });
+    Object.keys(rows).sort((a,b) => b - a).forEach(y => linhas.push(rows[y].sort((a,b) => a.transform[4] - b.transform[4]).map(it => it.str).join(" ").replace(/\s+/g, " ").trim())); }
+  return linhas;
+}
+function lerRomaneio(linhas){
+  const cores = []; let dentro = false, data = "", total = 0;
+  for (const l of linhas){
+    if (!data){ const d = l.match(/(\d{2})\/(\d{2})\/(\d{4})/); if (d) data = `${d[3]}-${d[2]}-${d[1]}`; }
+    if (/^cor\b.*pe[çc]as/i.test(l)){ dentro = true; continue; }
+    if (/total/i.test(l)){ const t = l.match(/([\d.]+)\s*pe[çc]as/i); if (t) total = +t[1].replace(/\./g, ""); if (dentro) dentro = false; continue; }
+    if (dentro){ const m = l.match(/^(.+?)\s+(\d+)\s+([\d.]+)$/); if (m) cores.push({cor: corCanon(m[1]), rolos: +m[2], qtd: +m[3].replace(/\./g, "")}); }
+  }
+  if (!cores.length) return lerSandel(linhas, data);
+  return {cores, data, total: total || sum(cores, c => c.qtd)};
+}
+// formato Sandel (nosso corte): cores nas colunas
+function lerSandel(linhas, data){
+  const num = x => +String(x).replace(/\./g, "").replace(",", ".");
+  const nums = l => (l.match(/[\d.]+/g) || []).map(num);
+  const iT = linhas.findIndex(l => /pe[çc]as por tamanho/i.test(l)); if (iT < 0) return {cores: [], data, total: 0};
+  let iH = iT + 1; while (iH < linhas.length && !/total$/i.test(linhas[iH])) iH++;
+  const cores = linhas[iH].replace(/\s*total$/i, "").trim().split(/\s+/).map(corCanon);
+  const tam = {}; let tot = null, i = iH + 1;
+  for (; i < linhas.length; i++){ const l = linhas[i];
+    if (/^total de pe[çc]as/i.test(l)){ tot = nums(l); break; }
+    const m = l.match(/^(\S+)\s+([\d.\s]+)$/); if (m) tam[m[1]] = nums(m[2]); }
+  if (!tot || tot.length < cores.length) return {cores: [], data, total: 0};
+  const lr = linhas.find(l => /^rolos\b/i.test(l)); const rol = lr ? nums(lr) : [];
+  return {cores: cores.map((c, j) => ({cor: c, rolos: rol[j] || 0, qtd: tot[j], tamanhos: Object.fromEntries(Object.entries(tam).map(([t, v]) => [t, v[j]]))})), data, total: tot[cores.length] || sum(tot.slice(0, cores.length), x => x)};
+}
+function pdfCorte(op){
+  const inp = document.createElement("input"); inp.type = "file"; inp.accept = "application/pdf,.pdf";
+  inp.onchange = async () => { const f = inp.files[0]; if (!f) return; toast("Lendo o PDF…");
+    let r; try { r = lerRomaneio(await pdfTexto(f)); } catch(e){ toast(typeof e === "string" ? e : "Não consegui ler este PDF."); return; }
+    if (!r.cores.length){ toast("Não achei a tabela de peças por cor neste PDF."); return; }
+    const ents = (op.corte||{}).entregas || []; const ja = sum(ents, e => pn(e.qtd));
+    const atualiza = ents.length && Math.abs(ja - r.total) < 0.5;
+    modal(`<h2>Corte lido do PDF</h2>
+      <div class="small muted">${r.data ? "Data do corte " + fdate(r.data) + " · " : ""}${atualiza ? "o corte já estava lançado com " + fmt(ja) + " peças: vou só separar por cor" : "vou lançar como entrega do corte"}</div>
+      <div class="hist">${r.cores.map(c => `<div><b>${esc(c.cor)}</b><span class="muted">${c.rolos ? c.rolos + " rolo" + (c.rolos>1?"s":"") : ""}${c.tamanhos ? " · " + Object.entries(c.tamanhos).map(([t,v]) => t + " " + fmt(v)).join(" · ") : ""}</span><b class="num">${fmt(c.qtd)} pç</b></div>`).join("")}
+      <div><b>Total</b><span></span><b class="num">${fmt(r.total)} pç</b></div></div>
+      <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="pcx">Cancelar</button><button class="btn pri" id="pok">Lançar corte</button></div>`, () => {
+      $("#pcx").onclick = closeModal;
+      $("#pok").onclick = async () => { $("#pok").disabled = true; $("#pok").textContent = "Salvando…";
+        let anexo = null; try { anexo = await uploadFile(f); } catch(e){}
+        const o = clone(S.ops.find(x => x.id === op.id)); o.corte ||= {}; o.corte.entregas ||= [];
+        const porCor = r.cores.map(c => ({cor: c.cor, rolos: c.rolos, qtd: c.qtd, ...(c.tamanhos && Object.keys(c.tamanhos).length ? {tamanhos: c.tamanhos} : {})}));
+        if (atualiza){ const e = o.corte.entregas[o.corte.entregas.length - 1]; if (o.corte.entregas.length === 1){ e.porCor = porCor; if (anexo) e.anexo = anexo; } else { o.corte.entregas = [{id: uid(), data: r.data || e.data, qtd: r.total, obs: "PDF do corte", porCor, anexo}]; } }
+        else o.corte.entregas.push({id: uid(), data: r.data || today(), qtd: r.total, obs: "PDF do corte", porCor, anexo});
+        closeModal(); saveOp(o); toast("Corte por cor lançado ✓");
+      };
+    });
+  };
+  inp.click();
+}
+function corHtml(op){
+  const cc = porCorCorte(op); const cores = Object.keys(cc); if (!cores.length) return "";
+  const cs = porCorCostura(op); const temCost = Object.keys(cs).length;
+  const pdf = ((op.corte||{}).entregas||[]).find(e => e.anexo?.id)?.anexo;
+  return `<div class="corbox"><div class="small muted">Peças por cor${temCost ? " · voltaram da costura" : ""}</div>${cores.map(c => `<div class="row between small"><span><b>${esc(c)}</b></span><span>${temCost ? `${fmt(cs[c]||0)} de ` : ""}<b>${fmt(cc[c])}</b> pç${temCost && cc[c] - (cs[c]||0) > 0 ? ` <span class="muted">· faltam ${fmt(cc[c] - (cs[c]||0))}</span>` : temCost ? " ✓" : ""}</span></div>`).join("")}${pdf ? `<a class="small gold" href="${viewUrl(pdf.id)}" target="_blank" rel="noopener">📄 Ver PDF do corte</a>` : ""}</div>`;
+}
 function hist(items, kind, parte, money){
   if (!items || !items.length) return `<div class="small muted">Nenhum lançamento.</div>`;
   return `<div class="hist">${items.map((e,i)=>`<div><span class="muted">${fdate(e.data)}</span><b class="num">${money?brl(pn(e.valor)):fmt(pn(e.qtd))+" pç"}</b>${pn(e.defeitos)?`<span class="chip s4">${fmt(pn(e.defeitos))} c/ defeito</span>`:""}${e.obs?`<span class="small muted">${esc(e.obs)}</span>`:""}${S.readonly?"":`<button class="x" aria-label="Excluir lançamento" data-delh="${kind}|${parte}|${i}">×</button>`}</div>`).join("")}</div>`;
@@ -986,7 +1058,8 @@ function viewOp(id){
 
     <div class="step ${cls(1)}"><i>${num(1)}</i><div><div class="row between"><h2>Corte</h2>${ed?`<button class="btn sm ghost" id="editcorte">${esc(c.local||"Cortador")} · ${brl(k.corteUn)}/pç ✎</button>`:`<span class="small muted">${esc(c.local||"")}</span>`}</div>
       <div class="row between small"><span><b>${fmt(k.cortado)}</b> de ${fmt(q)} cortadas</span>${k.aCortar?`<span class="muted">faltam ${fmt(k.aCortar)}</span>`:""}</div>${bar(k.cortado,q)}
-      ${ed && k.aCortar ? `<div><button class="btn sm pri" data-add="ce|">+ Chegou do corte</button></div>` : ""}
+      <div class="row">${ed && k.aCortar ? `<button class="btn sm pri" data-add="ce|">+ Chegou do corte</button>` : ""}${ed ? `<button class="btn sm" id="pdfcorte">📄 Ler PDF do corte</button>` : ""}</div>
+      ${corHtml(op)}
       <details class="mini"><summary>Entregas do corte (${(c.entregas||[]).length})</summary>${hist(c.entregas,"ce","")}${ed && !k.aCortar ? `<button class="btn sm" data-add="ce|">+ Entrega</button>` : ""}</details>
       ${ed ? `<details class="mini"><summary>Pagamento ao cortador · ${k.corteAPagar>0.005?`<b style="color:var(--bad)">a pagar ${brl(k.corteAPagar)}</b>`:`pago ${brl(k.cortePago)}`}</summary>${hist(c.pagamentos,"cp","",true)}<button class="btn sm" data-add="cp|">+ Paguei o cortador</button></details>` : ""}
     </div></div>
@@ -1001,6 +1074,7 @@ function viewOp(id){
         ${ed ? `<details class="mini"><summary>Pagamento à oficina · ${t.aPagar>0.005?`<b style="color:var(--bad)">a pagar ${brl(t.aPagar)}</b>`:`pago ${brl(t.pago)}`}</summary>${hist(t.pagamentos,"tp",t.idx,true)}<div class="row"><button class="btn sm" data-add="tp|${t.idx}">+ Paguei a oficina</button><button class="btn sm ghost" data-editparte="${t.idx}">Editar envio</button><button class="btn sm ghost danger" data-delparte="${t.idx}">Excluir envio</button></div></details>` : ""}
       </div>`).join("")}
       ${!k.partes.length ? `<div class="small muted">Nada enviado para oficina ainda.</div>` : ""}
+      ${Object.keys(porCorCostura(op)).length ? corHtml(op) : ""}
     </div></div>
 
     <div class="step ${cls(3)}"><i>${num(3)}</i><div><h2>Entregue à Thaty</h2>
@@ -1352,6 +1426,7 @@ function bind(){
   const ap = $("#addparte"); if (ap) ap.onclick = () => parteForm(op, null, k.aEnviar);
   document.querySelectorAll("[data-editparte]").forEach(b => b.onclick = () => parteForm(op, +b.dataset.editparte));
   document.querySelectorAll("[data-delparte]").forEach(b => b.onclick = () => confirmBox(`Excluir a parte T${+b.dataset.delparte+1} com entregas e pagamentos?`, () => upd(o => o.costuras.splice(+b.dataset.delparte,1))));
+  const pc = $("#pdfcorte"); if (pc) pc.onclick = () => pdfCorte(op);
   document.querySelectorAll("[data-add]").forEach(b => b.onclick = () => {
     const [kind, p] = b.dataset.add.split("|"); const money = kind === "cp" || kind === "tp";
     let sug = "";
@@ -1362,9 +1437,15 @@ function bind(){
     const fields = [{name:"data",label:"Data",type:"date",value:today()},
       {name:money?"valor":"qtd",label:money?"Valor pago (R$)":kind==="ec"?"Peças boas entregues":"Peças entregues",type:"num",value:sug}];
     if (kind === "ec") fields.push({name:"defeitos",label:"Peças com defeito (separadas)",type:"num",value:""});
+    const coresC = kind === "te" ? Object.keys(porCorCorte(op)) : [];
+    if (coresC.length){ const cs = porCorCostura(op), cc = porCorCorte(op); fields[1].label = "Peças entregues (ou preencha por cor abaixo)"; fields[1].value = "";
+      coresC.forEach((c, i) => fields.push({name:"cor" + i, label:`${c} · faltam ${fmt(Math.max(0, cc[c] - (cs[c]||0)))}`, type:"num", value:""})); }
     fields.push({name:"obs",label:kind==="ec"?"Observação (transportadora, rastreio…)":"Observação (opcional)",full:true});
     form({title:titles[kind], fields,
-      onSave: v => { if (!(money ? v.valor : v.qtd) && !(kind==="ec" && v.defeitos)) return "Informe um valor maior que zero."; upd(o => {
+      onSave: v => {
+        if (coresC.length){ const pc2 = coresC.map((c, i) => ({cor: c, qtd: pn(v["cor" + i])})).filter(x => x.qtd > 0); coresC.forEach((c, i) => delete v["cor" + i]);
+          if (pc2.length){ v.porCor = pc2; v.qtd = sum(pc2, x => x.qtd); } }
+        if (!(money ? v.valor : v.qtd) && !(kind==="ec" && v.defeitos)) return "Informe um valor maior que zero."; upd(o => {
         const list = kind==="ce" ? (o.corte.entregas ||= []) : kind==="cp" ? (o.corte.pagamentos ||= []) : kind==="te" ? (o.costuras[+p].entregas ||= []) : kind==="tp" ? (o.costuras[+p].pagamentos ||= []) : o.entregasCliente;
         list.push({id:uid(), ...v}); list.sort((a,b)=>a.data.localeCompare(b.data)); }); } });
   });
@@ -1451,7 +1532,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 66;
+const APP_V = 67;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
