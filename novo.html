@@ -548,6 +548,9 @@ function confirmBox(msg, onYes){
     $("#mno").onclick = closeModal; $("#myes").onclick = () => { closeModal(); onYes(); };
   });
 }
+function confirmar(titulo, msg, sim, onYes){
+  modal(`<h2>${esc(titulo)}</h2><p>${esc(msg)}</p><div class="row between"><button class="btn ghost" id="mno">Cancelar</button><button class="btn pri" id="myes">${esc(sim)}</button></div>`, () => { $("#mno").onclick = closeModal; $("#myes").onclick = () => { closeModal(); onYes(); }; });
+}
 function fileB64(blob){ return new Promise((res,rej)=>{ const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1]); fr.onerror = rej; fr.readAsDataURL(blob); }); }
 async function shrink(file){
   if (!file.type.startsWith("image/") || file.type === "image/gif") return file;
@@ -1556,7 +1559,7 @@ function bind(){
   const upd = fn => { const o = clone(op); o.corte ||= {entregas:[],pagamentos:[]}; o.costuras ||= []; o.entregasCliente ||= []; fn(o); saveOp(o); };
   const e1 = $("#editop"); if (e1) e1.onclick = () => opForm(op);
   const e2 = $("#editop2"); if (e2) e2.onclick = () => opForm(op);
-  const fim = $("#fimop"); if (fim) fim.onclick = () => upd(o => { o.concluida = !o.concluida; o.dataFinal = o.concluida ? (o.dataFinal || today()) : ""; });
+  const fim = $("#fimop"); if (fim) fim.onclick = () => { const go = () => upd(o => { o.concluida = !o.concluida; o.dataFinal = o.concluida ? (o.dataFinal || today()) : ""; }); const op0 = S.ops.find(o => o.id === S.opId), k0 = op0 && calc(op0); if (op0 && !op0.concluida && k0 && k0.qtd && k0.costurado < k0.qtd) confirmar("Concluir pedido?", `Foram entregues ${fmt(k0.costurado)} de ${fmt(k0.qtd)} peças. Concluir mesmo assim?`, "Concluir", go); else go(); };
   const del = $("#delop"); if (del) del.onclick = () => {
     if (S.lanc.some(l => l.opId === op.id && !l.auto)){ toast("Este pedido tem pagamentos ou reembolsos lançados. Exclua-os antes."); return; }
     confirmBox(`Excluir o pedido ${opCode(op)} com todo o corte, costura e cobranças automáticas?`, () => { S.lanc.filter(l => l.opId === op.id && l.auto).forEach(l => write("lanc/"+l.id, null)); write("ops/"+op.id, null); go("producoes"); });
@@ -1675,7 +1678,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 93;
+const APP_V = 94;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
@@ -1713,7 +1716,7 @@ function arrumaAbas(){
 }
 function entrou(){
   arrumaAbas(); if (!S._abriu){ S.view = "producoes"; S.opId = null; } S._abriu = true;
-  const w = $("#who"); w.hidden = false; w.textContent = S.user + " · trocar"; w.onclick = () => sair();
+  const w = $("#who"); w.hidden = false; w.textContent = S.user; w.title = "Trocar usuário"; w.onclick = () => confirmar("Trocar usuário?", "Você vai sair e precisará entrar de novo com o PIN.", "Sair", sair);
   render(); carregar(); checarPush();
   clearInterval(S.poll); S.poll = setInterval(checar, 25000);
 }
@@ -1764,7 +1767,7 @@ setInterval(checaVersao, 5 * 60 * 1000);
     if (store.get("pt_pin_prev") !== p){ store.set("ptn_cache", null); store.set("pt_pin_prev", p); }
     if (lerCache()) setSync("Atualizando…");
     entrou();
-    if (!S.user) api("login").then(j => { S.user = j.nome; store.set("pt_user", j.nome); const w = $("#who"); if (w) w.textContent = S.user + " · trocar"; }).catch(() => {});
+    if (!S.user) api("login").then(j => { S.user = j.nome; store.set("pt_user", j.nome); const w = $("#who"); if (w) w.textContent = S.user; }).catch(() => {});
   }
   render();
 })();
