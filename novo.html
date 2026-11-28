@@ -1173,6 +1173,8 @@ async function tecCompras(silencioso){
   const j = await r.json(); if (!j || !j.ok) throw new Error(j?.erro || "Erro no app Tecido");
   try { localStorage.setItem("tec_pin", pin); } catch(e){}
   const d = j.data; const lista = [...(d.vendas||[]), ...((d.inv && d.inv.retiradas)||[])];
+  // para o lucro: todas as vendas da Thaty (inclusive as antigas, sem rolos) + retiradas com rolos (as outras espelham uma venda)
+  S._tecCompras = [...(d.vendas||[]), ...((d.inv && d.inv.retiradas)||[]).filter(v => (v.rolos||[]).length)].filter(v => /tha|tati|taty/i.test(v.cliente||""));
   return lista.filter(v => /tha|tati|taty/i.test(v.cliente||"") && (v.rolos||[]).length).sort((a,b) => (b.data||"").localeCompare(a.data||""));
 }
 // lucro do tecido só na parte já paga pela Thaty
@@ -1204,7 +1206,7 @@ function syncPagTecido(){
   setTimeout(async () => {
     try {
       const compras = await tecCompras(true);
-      if (compras.length || localStorage.getItem("tec_pin")){ S._tecCompras = compras; if (S.view === "inicio" && !S.opId) render(); }
+      if (S._tecCompras){ if (S.view === "inicio" && !S.opId) render(); }
       const ligadas = new Set(S.ops.flatMap(o => (o.rolosTec||[]).map(r => r.k.split("|").slice(0,2).join("|"))));
       compras.forEach(v => {
         const ref = `${v.aba}|${v.linha}`; if (!ligadas.has(ref)) return;
@@ -1486,7 +1488,7 @@ function opForm(op, pre, after){
 }
 
 function bind(){
-  document.querySelectorAll("[data-tecluc]").forEach(tl => tl.onclick = async () => { try { const c = await tecCompras(); S._tecCompras = c; render(); } catch(e){ toast(e.message); } });
+  document.querySelectorAll("[data-tecluc]").forEach(tl => tl.onclick = async () => { try { await tecCompras(); render(); } catch(e){ toast(e.message); } });
   const cw = $("#cobrarwa"); if (cw) cw.onclick = () => { const m = msgCobranca(); window.open("https://wa.me/?text=" + encodeURIComponent(m), "_blank"); };
   document.querySelectorAll("[data-op]").forEach(b => b.onclick = () => go("producoes", b.dataset.op));
   document.querySelectorAll("[data-goto]").forEach(b => b.onclick = () => go(b.dataset.goto));
@@ -1658,7 +1660,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 82;
+const APP_V = 83;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
