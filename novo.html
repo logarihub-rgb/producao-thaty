@@ -865,7 +865,7 @@ function viewInicio(){
       <div class="ln"><span>Já foi feito</span><span class="v">${brl(feito)}</span></div>
       <div class="ln"><span>Ela já pagou</span><span class="v" style="color:var(--ok)">− ${brl(F.totRec)}</span></div>
       ${tot > 0.005 ? `<button class="btn big-cta2" id="cobrarwa">📲 Fechamento da semana</button>` : ""}
-    </div>${notifBox()}${viewFinanceiro()}`;
+    </div>${lucroCard()}${notifBox()}${viewFinanceiro()}`;
   }
   if (!adm()){
     const tot = sum(S.ops.filter(o => !pendente(o)), o => secsDe(o.id).tot) + secsDe("").tot;
@@ -1175,11 +1175,21 @@ async function tecCompras(silencioso){
   const d = j.data; const lista = [...(d.vendas||[]), ...((d.inv && d.inv.retiradas)||[])];
   return lista.filter(v => /tha|tati|taty/i.test(v.cliente||"") && (v.rolos||[]).length).sort((a,b) => (b.data||"").localeCompare(a.data||""));
 }
+function lucroCard(){
+  // lucro do Manuel com a Thaty: tecido (lucro das vendas no app Tecido) + assessoria (cobrada inteira)
+  const ass = sum(S.lanc.filter(l => l.tipo === "cobranca" && secaoDe(l) === "Assessoria"), l => pn(l.valor));
+  const tec = S._tecLucro;
+  return `<div class="card"><div class="lbl">Seu lucro com a Thaty</div>
+    <div class="ln"><span>Tecido</span><span class="v">${tec == null ? `<button class="btn ghost sm" id="tecluc">carregar</button>` : brl(tec)}</span></div>
+    <div class="ln"><span>Assessoria</span><span class="v">${brl(ass)}</span></div>
+    <div class="ln tot"><span>Lucro total</span><span class="v" style="color:var(--ok)">${brl(ass + (tec || 0))}</span></div></div>`;
+}
 function syncPagTecido(){
   if (!adm() || S._tecSync) return; S._tecSync = true;
   setTimeout(async () => {
     try {
       const compras = await tecCompras(true);
+      if (compras.length || localStorage.getItem("tec_pin")){ S._tecLucro = sum(compras, v => pn(v.lucro)); if (S.view === "inicio" && !S.opId) render(); }
       const ligadas = new Set(S.ops.flatMap(o => (o.rolosTec||[]).map(r => r.k.split("|").slice(0,2).join("|"))));
       compras.forEach(v => {
         const ref = `${v.aba}|${v.linha}`; if (!ligadas.has(ref)) return;
@@ -1461,6 +1471,7 @@ function opForm(op, pre, after){
 }
 
 function bind(){
+  const tl = $("#tecluc"); if (tl) tl.onclick = async () => { try { const c = await tecCompras(); S._tecLucro = sum(c, v => pn(v.lucro)); render(); } catch(e){ toast(e.message); } };
   const cw = $("#cobrarwa"); if (cw) cw.onclick = () => { const m = msgCobranca(); window.open("https://wa.me/?text=" + encodeURIComponent(m), "_blank"); };
   document.querySelectorAll("[data-op]").forEach(b => b.onclick = () => go("producoes", b.dataset.op));
   document.querySelectorAll("[data-goto]").forEach(b => b.onclick = () => go(b.dataset.goto));
@@ -1632,7 +1643,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 78;
+const APP_V = 79;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
