@@ -298,6 +298,20 @@ html,body{overflow-x:hidden;max-width:100%}
 .flow .fs{min-width:0}.flow .fs small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}.flow .fs b{white-space:normal;line-height:1.15;text-align:center;letter-spacing:-.2px}
 .insrow{display:grid;grid-template-columns:2fr 1fr .8fr 1fr auto;gap:6px;align-items:center}.insrow input{min-width:0;width:100%;background:var(--bg);border:1px solid var(--line);color:inherit;border-radius:8px;padding:8px}.insrow.insh{margin-bottom:-4px}
 .corbox{margin-top:8px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;gap:4px}
+.masb{border:0;background:transparent;padding:0 4px;cursor:pointer;display:flex;align-items:center}.masb svg{width:32px;height:32px;display:block}
+.chat{display:flex;flex-direction:column;gap:8px;padding:10px 0 150px}
+.msg{max-width:88%;padding:10px 12px;border-radius:14px;font-size:14px;line-height:1.45}
+.msg.eu{align-self:flex-end;background:var(--accent);color:#14110c;border-bottom-right-radius:4px;font-weight:600}
+.msg.bot{align-self:flex-start;background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:4px}
+.msg.bot .ln{display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px solid var(--line);font-size:13.5px}.msg.bot .ln:last-child{border:0}
+.msg.bot h4{margin:0 0 6px;font-size:15px;color:var(--accent)}
+.bav{display:flex;gap:8px;align-items:flex-end}.bav svg{width:30px;height:30px;flex:none}
+.mic{border:1px solid var(--line);border-radius:22px;background:#221f1b;color:var(--accent);width:46px;flex:none;display:flex;align-items:center;justify-content:center}.mic svg{width:20px;height:20px}.mic.on{background:#b5452f;color:#fff;animation:pul 1s infinite}
+@keyframes pul{50%{opacity:.6}}
+.cbar{position:fixed;left:0;right:0;bottom:calc(62px + env(safe-area-inset-bottom));z-index:6;background:#0c0b0a;border-top:1px solid var(--line);padding:8px 10px}
+@media (min-width:761px){.cbar{bottom:0}}
+.cbar .sg{display:flex;gap:6px;overflow-x:auto;margin-bottom:8px}.cbar .sg button{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:16px;padding:6px 11px;font:inherit;font-size:12.5px}
+.cbar form{display:flex;gap:8px;max-width:640px;margin:0 auto}.cbar input{flex:1;min-width:0;border-radius:22px;padding:11px 16px;background:var(--bg);border:1px solid var(--line);color:inherit}.cbar form button{border:0;border-radius:22px;background:var(--accent);color:#14110c;font:inherit;font-weight:700;padding:0 16px}.cbar form button.mic{background:#221f1b;color:var(--accent);border:1px solid var(--line);padding:0}.cbar form button.mic.on{background:#b5452f;color:#fff}
 </style>
 </head>
 <body>
@@ -310,6 +324,7 @@ html,body{overflow-x:hidden;max-width:100%}
     <button data-v="mais">Mais</button>
   </nav>
   <button class="fab" id="fab" title="Lançar serviço" hidden aria-label="Lançar outro serviço ou reembolso"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M6 2h12a1 1 0 0 1 1 1v18l-3-2-2 2-2-2-2 2-2-2-3 2V3a1 1 0 0 1 1-1zm2 5v2h8V7H8zm0 4v2h8v-2H8zm0 4v2h5v-2H8z"/></svg><span>Serviço</span></button>
+  <button class="masb" id="masb" hidden aria-label="Assistente" title="Assistente"></button>
   <span class="sync" id="sync">Conectando…</span><button class="who" id="who" hidden></button>
 </div></header>
 <main id="main"><div class="empty">Carregando dados da produção…</div></main>
@@ -572,13 +587,14 @@ function render(){
   document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-current", b.dataset.v === S.view ? "page" : "false"));
   const m = $("#main");
   $("#fab").hidden = !S.ok || S.readonly; $("#tabs").style.visibility = S.ok ? "" : "hidden";
+  const mb = $("#masb"); if (mb){ mb.hidden = !S.ok; if (!mb.innerHTML) mb.innerHTML = mascote(); mb.onclick = () => { S.view = "assist"; S.opId = null; render(); window.scrollTo(0, document.body.scrollHeight); }; }
   if (!S.ok){ m.innerHTML = viewLogin(); bindLogin(); return; }
   if (S.erroCarga && !COLS.every(c => S.loaded[c])){ m.innerHTML = `<div class="empty">Não foi possível carregar os dados. Verifique a internet. <button class="btn" id="retry">Tentar de novo</button></div>`; $("#retry").onclick = carregar; return; }
   if (!COLS.every(c => S.loaded[c])){ m.innerHTML = `<div class="empty">Carregando dados da produção…</div>`; return; }
   S.F = finance();
   const ro = S.readonly ? `<div class="note">Você está vendo em modo leitura: sua conta não tem permissão para editar.</div>` : "";
   if (S.view === "financeiro" && S.user) S.view = "inicio";
-  const html = S.view === "inicio" ? viewInicio() : S.view === "financeiro" ? viewFinanceiro()
+  const html = S.view === "assist" ? viewAssist() : S.view === "inicio" ? viewInicio() : S.view === "financeiro" ? viewFinanceiro()
     : S.view === "mais" ? viewMais()
     : (S.opId ? viewOp(S.opId) : viewProducoes());
   m.innerHTML = ro + html;
@@ -848,6 +864,7 @@ function viewInicio(){
       ${tot > 0.005 ? `<div class="lbl">Falta a Thaty pagar</div><div class="big">${brl(tot)}</div>` : `<div class="lbl">Conta da Thaty</div><div class="big" style="color:var(--ok)">Tudo pago ✓</div>`}
       <div class="ln"><span>Já foi feito</span><span class="v">${brl(feito)}</span></div>
       <div class="ln"><span>Ela já pagou</span><span class="v" style="color:var(--ok)">− ${brl(F.totRec)}</span></div>
+      ${tot > 0.005 ? `<button class="btn big-cta2" id="cobrarwa">📲 Cobrar no WhatsApp</button>` : ""}
     </div>${notifBox()}${viewFinanceiro()}`;
   }
   if (!adm()){
@@ -1274,6 +1291,84 @@ function viewProdutosThaty(){
     return op ? cardPeca(op, true) : `<div class="card"><div class="lbl">${esc(p.nome)} · custo por peça</div><div class="small muted">Ainda sem produção deste modelo. O valor aparece depois do primeiro corte.</div>${adm() ? `<button class="btn sm pri" data-prod="${esc(p.id)}" style="margin-top:10px;align-self:flex-start">✏️ Editar produto</button>` : ""}</div>`; });
   return `<div class="row between"><h1>Produtos</h1>${adm() ? `<button class="btn pri sm" id="newprod">+ Novo produto</button>` : ""}</div><div class="small muted" style="margin:-4px 0 10px">Toque em um modelo para ver a conta: tecido, corte, costura e assessoria.</div>${cards.join("") || `<div class="empty">Nenhum produto cadastrado.</div>`}`;
 }
+function mascote(cl){return`<svg viewBox="0 0 64 64" ${cl?`class="${cl}"`:""} aria-hidden="true"><defs><clipPath id="sdc"><circle cx="32" cy="32" r="30"/></clipPath></defs><circle cx="32" cy="32" r="31" fill="#2a241d" stroke="#b8904f" stroke-width="2"/><g clip-path="url(#sdc)"><path d="M9 66 C9 51 18 45 32 45 C46 45 55 51 55 66 Z" fill="#3b3229"/><path d="M25 46 L32 53 L39 46" fill="none" stroke="#ece4d4" stroke-width="2.4" stroke-linejoin="round"/><path d="M16 48 C21 53 25 59 24 66 M48 48 C43 53 39 59 40 66" fill="none" stroke="#e8c547" stroke-width="5" stroke-linecap="round"/><path d="M16 48 C21 53 25 59 24 66 M48 48 C43 53 39 59 40 66" fill="none" stroke="#6b5212" stroke-width="5" stroke-dasharray="0.9 2.6"/><rect x="29" y="41" width="6" height="5" fill="#e9b88a"/><ellipse cx="32" cy="29" rx="13.5" ry="14.5" fill="#f3cda6"/><path d="M18 27.5 C17.5 15 25 9.5 32.5 9.5 C41.5 9.5 47 16 46 27.5 C44 21.5 38.5 18.5 31 19.5 C25.5 20.2 21.5 23 18 27.5 Z" fill="#3a2a1c"/><rect x="44" y="14" width="3" height="15" rx="1" transform="rotate(25 45.5 21.5)" fill="#e8c547"/><path d="M48.3 27.6 l-1.9 3.4 -0.9 -3.8z" fill="#f3cda6"/><ellipse cx="18.5" cy="30.5" rx="2.3" ry="3.2" fill="#eab98c"/><ellipse cx="45.5" cy="30.5" rx="2.3" ry="3.2" fill="#eab98c"/><ellipse cx="26.5" cy="29.5" rx="2.2" ry="2.5" fill="#1a1410"/><ellipse cx="37.5" cy="29.5" rx="2.2" ry="2.5" fill="#1a1410"/><circle cx="27.3" cy="28.6" r=".8" fill="#fff"/><circle cx="38.3" cy="28.6" r=".8" fill="#fff"/><path d="M23.5 25 q3 -1.6 6 0 M34.5 25 q3 -1.6 6 0" fill="none" stroke="#3a2a1c" stroke-width="1.2" stroke-linecap="round"/><path d="M27 35.5 Q32 40 37 35.5" fill="#fff" stroke="#7a3b2a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="22.5" cy="34" r="2.2" fill="#e8897a" opacity=".45"/><circle cx="41.5" cy="34" r="2.2" fill="#e8897a" opacity=".45"/></g></svg>`}
+/* ---------- ASSISTENTE (responde na hora com os dados do app, sem IA paga) ---------- */
+let CH = null, OUVINDO = false, REC = null, VOZ = false;
+const nrm = x => String(x||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+function chLoad(){ if (CH) return; try { CH = JSON.parse(localStorage.getItem("pt_chat_" + (S.user||"")) || "[]"); } catch(e){ CH = []; } }
+function chSave(){ try { localStorage.setItem("pt_chat_" + (S.user||""), JSON.stringify(CH.slice(-40))); } catch(e){} }
+const sugAssist = () => ["Pedidos em andamento", "Quanto falta pagar?", "Peças por cor", "Último pagamento", "Custo por peça", "Chave Pix", "Limpar conversa"];
+function viewAssist(){ chLoad();
+  let h = `<button class="btn sm ghost" onclick="S.view='producoes';render()">‹ Voltar</button><div class="chat">`;
+  if (!CH.length) h += `<div class="bav">${mascote()}<div class="msg bot"><h4>Oi! Sou o assistente da produção</h4>Pergunte do seu jeito, por exemplo:<br>• <b>como está a P4</b><br>• <b>quanto falta pagar</b><br>• <b>peças por cor</b><br>• <b>custo por peça da regata</b><br><br>Toque no microfone 🎤 para falar.</div></div>`;
+  h += CH.map(m => m.eu ? `<div class="msg eu">${esc(m.t)}</div>` : `<div class="bav">${mascote()}<div class="msg bot">${m.h}</div></div>`).join("") + "</div>";
+  h += `<div class="cbar"><div class="sg">${sugAssist().map(t => `<button type="button" onclick="pergAssist('${t}')">${t}</button>`).join("")}</div><form onsubmit="event.preventDefault();const i=document.getElementById('cq');const v=i.value;i.value='';pergAssist(v)"><button type="button" class="mic${OUVINDO?" on":""}" onclick="falar()" aria-label="Falar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button><input id="cq" placeholder="Pergunte ou toque no 🎤" autocomplete="off" enterkeyhint="send"><button>Enviar</button></form></div>`;
+  return h;
+}
+function falar(){ const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return toast("Este celular não tem reconhecimento de voz no app. Use o microfone do teclado.");
+  if (OUVINDO && REC){ REC.stop(); return; }
+  REC = new SR(); REC.lang = "pt-BR"; REC.interimResults = false; REC.maxAlternatives = 1;
+  REC.onresult = e => { VOZ = true; pergAssist(e.results[0][0].transcript); };
+  REC.onerror = e => { OUVINDO = false; render(); if (e.error === "not-allowed") toast("Libere o microfone para o app nas configurações do celular"); else if (e.error !== "no-speech" && e.error !== "aborted") toast("Não ouvi bem, tente de novo"); };
+  REC.onend = () => { OUVINDO = false; if (S.view === "assist") render(); };
+  try { REC.start(); OUVINDO = true; render(); } catch(e){ toast("Microfone ocupado, tente de novo"); }
+}
+function diz(h){ try { if (!("speechSynthesis" in window)) return; const d = document.createElement("div"); d.innerHTML = h.replace(/<\/(div|h4)>|<br>/g, ". ");
+  const u = new SpeechSynthesisUtterance(d.textContent.replace(/R\$\s?/g, "").replace(/\s+/g, " ").trim()); u.lang = "pt-BR"; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch(e){} }
+function pergAssist(t){ t = String(t||"").trim(); if (!t) return; chLoad();
+  if (/^limpar( conversa)?$/i.test(t)){ CH = []; chSave(); render(); return; }
+  CH.push({eu:1, t}); let r; try { r = responde(t); } catch(e){ r = "Não consegui montar a resposta."; }
+  CH.push({h:r}); chSave(); render(); if (VOZ){ VOZ = false; diz(r); }
+  requestAnimationFrame(() => window.scrollTo(0, document.body.scrollHeight));
+}
+const lnA = (a, b) => `<div class="ln"><span>${a}</span><span style="text-align:right">${b||""}</span></div>`;
+function responde(t){
+  const q = nrm(t), ops = sortedOps().filter(o => !pendente(o));
+  const abertos = ops.filter(o => calc(o).aberta || secsDe(o.id).tot > 0.005);
+  const mOp = q.match(/\bp\s?(\d{1,3})\b/), op = mOp ? S.ops.find(o => +o.num === +mOp[1]) : null;
+  const prod = S.produtos.find(p => nrm(p.nome).split(/[\s-]+/).some(w => w.length > 3 && q.includes(w)));
+  if (/^(oi|ola|opa|bom dia|boa tarde|boa noite)\b/.test(q) && q.length < 18) return "Olá! O que você quer saber? Use os botões aí embaixo ou pergunte do seu jeito.";
+  if (/pix|chave/.test(q)) return `<h4>Chave Pix</h4>${lnA("Chave", `<b>${PIX.chave}</b>`)}${lnA("Banco", PIX.banco)}${lnA("Nome", PIX.nome)}`;
+  if (op){ const k = calc(op), g = secsDe(op.id), cc = porCorCorte(op);
+    let h = `<h4>${opCode(op)} · ${esc(produto(op.produtoId)?.nome || "")}</h4>` + lnA("Situação", `<b>${esc(k.stLabel)}</b>`) + lnA("Pedido", fmt(k.pedido) + " pç");
+    if (k.cortado) h += lnA("Saíram do corte", fmt(k.cortado) + " pç");
+    if (k.enviado) h += lnA("Na oficina", fmt(k.enviado) + " pç") + lnA("Voltaram da costura", fmt(k.costurado) + " pç");
+    Object.keys(cc).forEach(c => h += lnA(esc(c), fmt(cc[c]) + " pç"));
+    h += lnA("Falta pagar", `<b>${brl(g.tot)}</b>`) + g.secs.map(x => lnA(`<span class="muted">${x.nome}</span>`, brl(x.ab))).join("");
+    return h; }
+  if (/falta|devo|deve|pagar|aberto|divid|quanto/.test(q) && !/custo|peca/.test(q)){
+    const gs = ops.map(o => ({o, g: secsDe(o.id)})).filter(x => x.g.tot > 0.005), ger = secsDe(""), tot = sum(gs, x => x.g.tot) + ger.tot;
+    if (tot < 0.01) return "Tudo pago! ✅";
+    return `<h4>Falta pagar ${brl(tot)}</h4>` + gs.map(x => lnA(`<b>${opCode(x.o)}</b> <span class="muted">${x.g.secs.map(s => s.nome).join(", ")}</span>`, brl(x.g.tot))).join("") + (ger.tot > 0.005 ? lnA("Serviços gerais", brl(ger.tot)) : "") + `<div class="small muted" style="margin-top:6px">Pix: ${PIX.chave}</div>`; }
+  if (/paguei|pagamento|recebi|recebeu|comprovante/.test(q)){
+    const L = S.lanc.filter(l => l.tipo === "recebimento").sort((a,b) => (b.data||"").localeCompare(a.data||"")).slice(0, 5);
+    return L.length ? `<h4>Últimos pagamentos</h4>` + L.map(l => lnA(fdate(l.data), `<b>${brl(pn(l.valor))}</b>`)).join("") + lnA("Total pago", brl(S.F.totRec)) : "Nenhum pagamento lançado ainda."; }
+  if (/\bcor(es)?\b|preto|marrom|\boff\b|rubi|branco/.test(q)){
+    const L = abertos.filter(o => Object.keys(porCorCorte(o)).length);
+    if (!L.length) return "Nenhum pedido em andamento com o corte separado por cor ainda.";
+    return L.map(o => { const cc = porCorCorte(o), cs = porCorCostura(o), tc = Object.keys(cs).length;
+      return `<h4>${opCode(o)} · ${esc(produto(o.produtoId)?.nome || "")}</h4>` + Object.keys(cc).map(c => lnA(esc(c), tc ? `${fmt(cs[c]||0)} de ${fmt(cc[c])} pç` : fmt(cc[c]) + " pç")).join(""); }).join("<br>"); }
+  if (/custo|peca|tecido|preco/.test(q)){
+    const prods = prod ? [prod] : S.produtos;
+    return prods.map(p => { const o = ops.find(x => x.produtoId === p.id); if (!o) return `<h4>${esc(p.nome)}</h4><span class="muted">Ainda sem produção.</span>`;
+      const c = custoPeca(o, calc(o)); return `<h4>${esc(p.nome)} · ${brl(c.total)} por peça</h4>` + c.it.map(x => lnA(x.n, brl(x.v))).join(""); }).join("<br>"); }
+  if (/pedido|andamento|producao|onde|etapa|status|como esta|situacao|costura|corte|oficina/.test(q) || prod){
+    const L = prod ? abertos.filter(o => o.produtoId === prod.id) : abertos;
+    return L.length ? `<h4>${L.length} pedido${L.length>1?"s":""} em andamento</h4>` + L.map(o => { const k = calc(o); return lnA(`<b>${opCode(o)}</b> ${esc(produto(o.produtoId)?.nome || "")}`, `<span class="muted">${esc(k.stLabel)}</span>`); }).join("") : "Nenhum pedido em andamento agora."; }
+  return "Não entendi essa. Tente <b>pedidos em andamento</b>, <b>quanto falta pagar</b>, <b>peças por cor</b>, <b>custo por peça</b> ou o código de um pedido, como <b>P4</b>.";
+}
+/* mensagem de cobrança para o WhatsApp: tudo o que está em aberto, por pedido e etapa */
+function proxSabado(){ const d = new Date(); d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7)); return d.toISOString().slice(0,10); }
+function msgCobranca(){
+  const nomeSec = k => k === "Servicos" ? "Serviços" : (SECOES.find(x => x[0] === k) || [0, k])[1];
+  const blocos = []; let tot = 0;
+  sortedOps().filter(o => !pendente(o)).reverse().forEach(o => { const g = secsDe(o.id); if (g.tot <= 0.005) return; tot += g.tot;
+    blocos.push(`*${opCode(o)} · ${produto(o.produtoId)?.nome || ""}*\n` + g.secs.map(x => `• ${nomeSec(x.key)}: ${brl(x.ab)}`).join("\n")); });
+  const ger = S.lanc.filter(l => l.tipo !== "recebimento" && !l.opId).map(l => ({l, ab: pn(l.valor) - (S.F.map[l.id]?.pago || 0)})).filter(x => x.ab > 0.005);
+  if (ger.length){ const t = sum(ger, x => x.ab); tot += t; blocos.push(`*Serviços gerais*\n` + ger.map(x => `• ${x.l.desc || "Serviço"}: ${brl(x.ab)}`).join("\n")); }
+  return `Oi, Thaty! Segue o que está em aberto da produção:\n\n${blocos.join("\n\n")}\n\n*Total: ${brl(tot)}*\nPagamento até sábado, ${fdate(proxSabado())}.\n\nPix: ${PIX.chave}\n${PIX.banco} · ${PIX.nome}\n\nDepois é só mandar o comprovante pelo app. Obrigado! 🙏`;
+}
 function viewCadastros(){
   if (!ehManuel() || S.sub === "insumos") S.sub = "produtos";
   const sub = S.sub; const ed = !S.readonly && ehManuel();
@@ -1365,6 +1460,7 @@ function opForm(op, pre, after){
 }
 
 function bind(){
+  const cw = $("#cobrarwa"); if (cw) cw.onclick = () => { const m = msgCobranca(); window.open("https://wa.me/?text=" + encodeURIComponent(m), "_blank"); };
   document.querySelectorAll("[data-op]").forEach(b => b.onclick = () => go("producoes", b.dataset.op));
   document.querySelectorAll("[data-goto]").forEach(b => b.onclick = () => go(b.dataset.goto));
   const ea = $("#extall"); if (ea) ea.onclick = () => { S.extTodos = true; render(); };
@@ -1535,7 +1631,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 68;
+const APP_V = 70;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
