@@ -611,10 +611,10 @@ function fluxo(op, k){
     const nx = adm() ? `Pedido novo: <b>aceite para começar</b>` : `Pedido enviado · <b>aguardando o Manuel aceitar</b>`;
     return {html, next:`<div class="next">${nx}</div>`, cur:0};
   }
-  const done = [k.etapa[0] === 2, q && k.cortado >= q, q && k.enviado >= q, op.concluida || (q && k.costurado >= q)];
+  const done = [k.etapa[0] === 2, q && k.cortado >= q, op.concluida || (q && k.enviado >= q && k.naCostura <= 0), op.concluida || (q && k.costurado >= q)];
   const cur = done.findIndex(d => !d);
   const subs = [op.retalho ? "retalho" : pn(op.kg) ? fmt(pn(op.kg),0)+" kg" : "falta",
-    k.cortado > 0 ? `${fmt(k.cortado)} pç` : `0/${fmt(k.pedido)}`, `${fmt(k.enviado)}/${fmt(q)}`, `${fmt(k.costurado)}/${fmt(q)}`];
+    k.cortado > 0 ? `${fmt(k.cortado)} pç` : `0/${fmt(k.pedido)}`, `${fmt(k.costurado)}/${fmt(q)}`, `${fmt(k.costurado)}/${fmt(q)}`];
   const nomes = ["Tecido","Corte","Costura","Entregue"];
   const html = `<div class="flow f5"><div class="fs done"><i>✓</i><b>Pedido</b><small>aceito</small></div>${nomes.map((n,i)=>`<div class="fs ${done[i]?"done":i===cur?"now":""}"><i>${done[i]?"✓":i+2}</i><b>${n}</b><small>${subs[i]}</small></div>`).join("")}</div>`;
   let nx, ok = false;
@@ -1088,11 +1088,11 @@ function viewOp(id){
     <div class="step ${cls(2)}"><i>${num(2)}</i><div><div class="row between"><h2>Costura</h2>${ed && k.aEnviar ? `<button class="btn sm pri" id="addparte">+ Enviar ${fmt(k.aEnviar)} pç p/ oficina</button>` : ""}</div>
       <div class="row between small"><span><b>${fmt(k.enviado)}</b> de ${fmt(q)} enviadas às oficinas</span></div>
       ${k.partes.map(t => `<div class="oft">
-        <div class="row between"><b>${esc(t.local||"Oficina")}</b><span class="small muted">${fmt(t.q)} pç × ${brl(t.un)} · enviado ${fdate(t.data)}</span></div>
+        <div class="row between"><b>${esc(t.local||"Oficina")}</b><span class="small muted">enviou ${fmt(t.q)} pç · ${brl(t.un)}/pç · ${fdate(t.data)}</span></div>
         <div class="row between small"><span>Devolveu <b>${fmt(t.entregue)}</b> de ${fmt(t.q)}</span>${t.aEntregar?`<span class="muted">faltam ${fmt(t.aEntregar)}</span>`:`<span class="chip s3">completo</span>`}</div>${bar(t.entregue,t.q)}
         ${ed && t.aEntregar ? `<div><button class="btn sm pri" data-add="te|${t.idx}">+ Chegou da oficina</button></div>` : ""}
         <details class="mini"><summary>Entregas (${(t.entregas||[]).length})</summary>${hist(t.entregas,"te",t.idx)}${ed && !t.aEntregar ? `<button class="btn sm" data-add="te|${t.idx}">+ Entrega</button>` : ""}</details>
-        ${ed ? `<details class="mini"><summary>Pagamento à oficina · ${t.aPagar>0.005?`<b style="color:var(--bad)">a pagar ${brl(t.aPagar)}</b>`:`pago ${brl(t.pago)}`}</summary>${hist(t.pagamentos,"tp",t.idx,true)}<div class="row"><button class="btn sm" data-add="tp|${t.idx}">+ Paguei a oficina</button><button class="btn sm ghost" data-editparte="${t.idx}">Editar envio</button><button class="btn sm ghost danger" data-delparte="${t.idx}">Excluir envio</button></div></details>` : ""}
+        ${ed ? `<details class="mini"><summary>Pagamento à oficina · ${t.aPagar>0.005?`<b style="color:var(--bad)">a pagar ${brl(t.aPagar)}</b> <span class="muted">(${fmt(t.entregue)} pç devolvidas × ${brl(t.un)})</span>`:`pago ${brl(t.pago)}`}</summary>${hist(t.pagamentos,"tp",t.idx,true)}<div class="row"><button class="btn sm" data-add="tp|${t.idx}">+ Paguei a oficina</button><button class="btn sm ghost" data-editparte="${t.idx}">Editar envio</button><button class="btn sm ghost danger" data-delparte="${t.idx}">Excluir envio</button></div></details>` : ""}
       </div>`).join("")}
       ${!k.partes.length ? `<div class="small muted">Nada enviado para oficina ainda.</div>` : ""}
       ${Object.keys(porCorCostura(op)).length ? corHtml(op) : ""}
@@ -1660,7 +1660,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 88;
+const APP_V = 89;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
