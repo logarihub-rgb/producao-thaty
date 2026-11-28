@@ -1177,19 +1177,27 @@ async function tecCompras(silencioso){
 }
 // lucro do tecido só na parte já paga pela Thaty
 // pago = o que vale mais: o recebido no app Tecido ou o pagamento do tecido do pedido aqui
-const tecLucroPago = vs => sum(vs, v => { const t = (v.tipo === "pronta" ? pn(v.valorReal) : (pn(v.valorReal) || pn(v.estimado))) + pn(v.frete);
+const tecLucroPago = (vs, aberto) => sum(vs, v => { const t = (v.tipo === "pronta" ? pn(v.valorReal) : (pn(v.valorReal) || pn(v.estimado))) + pn(v.frete);
   let f = v.pago ? 1 : t > 0 ? Math.min(1, pn(v.recebido) / t) : 0;
   const ref = `${v.aba}|${v.linha}`, op = S.ops.find(o => (o.rolosTec||[]).some(r => r.k.split("|").slice(0,2).join("|") === ref));
   if (op && S.F){ const ls = S.lanc.filter(l => l.tipo === "cobranca" && l.opId === op.id && secaoDe(l) === "Tecido"), c = sum(ls, l => pn(l.valor)); if (c > 0.005) f = Math.max(f, Math.min(1, sum(ls, l => S.F.map[l.id]?.pago || 0) / c)); }
-  return pn(v.lucro) * f; });
+  return pn(v.lucro) * (aberto ? 1 - f : f); });
 function lucroCard(){
-  // lucro do Manuel com a Thaty: tecido (lucro das vendas no app Tecido) + assessoria (cobrada inteira)
-  const ass = sum(S.lanc.filter(l => l.tipo === "cobranca" && secaoDe(l) === "Assessoria"), l => S.F.map[l.id]?.pago || 0);
-  const tec = S._tecCompras ? tecLucroPago(S._tecCompras) : null;
-  return `<div class="card"><div class="lbl">Seu lucro com a Thaty · já recebido</div>
-    <div class="ln"><span>Tecido</span><span class="v">${tec == null ? `<button class="btn ghost sm" id="tecluc">carregar</button>` : brl(tec)}</span></div>
-    <div class="ln"><span>Assessoria</span><span class="v">${brl(ass)}</span></div>
-    <div class="ln tot"><span>Lucro total</span><span class="v" style="color:var(--ok)">${brl(ass + (tec || 0))}</span></div></div>`;
+  // lucro do Manuel com a Thaty: tecido (lucro das vendas no app Tecido) + assessoria — separado em recebido e a receber
+  const as = S.lanc.filter(l => l.tipo === "cobranca" && secaoDe(l) === "Assessoria");
+  const assP = sum(as, l => S.F.map[l.id]?.pago || 0), assA = sum(as, l => pn(l.valor)) - assP;
+  const ok = !!S._tecCompras, tecP = ok ? tecLucroPago(S._tecCompras) : 0, tecA = ok ? tecLucroPago(S._tecCompras, true) : 0;
+  const tv = v => ok ? brl(v) : `<button class="btn ghost sm" data-tecluc>carregar</button>`;
+  return `<div class="card"><div class="lbl">Seu lucro com a Thaty</div>
+    <div class="small muted" style="margin-top:2px">Já recebido</div>
+    <div class="ln"><span>Tecido</span><span class="v">${tv(tecP)}</span></div>
+    <div class="ln"><span>Assessoria</span><span class="v">${brl(assP)}</span></div>
+    <div class="ln tot"><span>Lucro recebido</span><span class="v" style="color:var(--ok)">${brl(assP + tecP)}</span></div>
+    <div class="small muted" style="margin-top:8px">A receber (estimativa)</div>
+    <div class="ln"><span>Tecido</span><span class="v">${tv(tecA)}</span></div>
+    <div class="ln"><span>Assessoria</span><span class="v">${brl(assA)}</span></div>
+    <div class="ln tot"><span>Lucro a receber</span><span class="v gold">${brl(assA + tecA)}</span></div>
+    <div class="ln"><span><b>Lucro previsto total</b></span><span class="v"><b>${brl(assP + tecP + assA + tecA)}</b></span></div></div>`;
 }
 function syncPagTecido(){
   if (!adm() || S._tecSync) return; S._tecSync = true;
@@ -1478,7 +1486,7 @@ function opForm(op, pre, after){
 }
 
 function bind(){
-  const tl = $("#tecluc"); if (tl) tl.onclick = async () => { try { const c = await tecCompras(); S._tecCompras = c; render(); } catch(e){ toast(e.message); } };
+  document.querySelectorAll("[data-tecluc]").forEach(tl => tl.onclick = async () => { try { const c = await tecCompras(); S._tecCompras = c; render(); } catch(e){ toast(e.message); } });
   const cw = $("#cobrarwa"); if (cw) cw.onclick = () => { const m = msgCobranca(); window.open("https://wa.me/?text=" + encodeURIComponent(m), "_blank"); };
   document.querySelectorAll("[data-op]").forEach(b => b.onclick = () => go("producoes", b.dataset.op));
   document.querySelectorAll("[data-goto]").forEach(b => b.onclick = () => go(b.dataset.goto));
@@ -1650,7 +1658,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 81;
+const APP_V = 82;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
