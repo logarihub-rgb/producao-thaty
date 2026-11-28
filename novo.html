@@ -864,7 +864,7 @@ function viewInicio(){
       ${tot > 0.005 ? `<div class="lbl">Falta a Thaty pagar</div><div class="big">${brl(tot)}</div>` : `<div class="lbl">Conta da Thaty</div><div class="big" style="color:var(--ok)">Tudo pago ✓</div>`}
       <div class="ln"><span>Já foi feito</span><span class="v">${brl(feito)}</span></div>
       <div class="ln"><span>Ela já pagou</span><span class="v" style="color:var(--ok)">− ${brl(F.totRec)}</span></div>
-      ${tot > 0.005 ? `<button class="btn big-cta2" id="cobrarwa">📲 Cobrar no WhatsApp</button>` : ""}
+      ${tot > 0.005 ? `<button class="btn big-cta2" id="cobrarwa">📲 Enviar resumo da semana</button>` : ""}
     </div>${notifBox()}${viewFinanceiro()}`;
   }
   if (!adm()){
@@ -1373,7 +1373,7 @@ function msgCobranca(){
   const ger = S.lanc.filter(l => l.tipo !== "recebimento" && !l.opId).map(l => ({l, ab: pn(l.valor) - (S.F.map[l.id]?.pago || 0)})).filter(x => x.ab > 0.005);
   if (ger.length){ const t = sum(ger, x => x.ab); tot += t; blocos.push(`*Serviços gerais*\n` + ger.map(x => `• ${x.l.desc || "Serviço"}: ${brl(x.ab)}`).join("\n")); }
   const fim = proxSabado(), ini = (() => { const d = new Date(fim + "T12:00:00"); d.setDate(d.getDate() - 6); return d.toISOString().slice(0,10); })(), dm = x => fdate(x).slice(0,5);
-  return `Oi, Thaty! Segue o que está em aberto referente a esta semana (${dm(ini)} a ${dm(fim)}):\n\n${blocos.join("\n\n")}\n\n*Total: ${brl(tot)}*\nPagamento até sábado, ${fdate(proxSabado())}.\n\nPix: ${PIX.chave}\n${PIX.banco} · ${PIX.nome}\n\nObrigado! 🙏`;
+  return `Oi, Thaty! Tudo bem? 😊 Segue o resumo dos pagamentos referentes à semana (${dm(ini)} a ${dm(fim)}):\n\n${blocos.join("\n\n")}\n\n*Total da semana: ${brl(tot)}*\n\nPix: ${PIX.chave}\n${PIX.banco} · ${PIX.nome}\n\nObrigado! 🙏`;
 }
 function viewCadastros(){
   if (!ehManuel() || S.sub === "insumos") S.sub = "produtos";
@@ -1637,7 +1637,7 @@ function prodForm(p){
 }
 
 /* ---------- login e sincronização ---------- */
-const APP_V = 72;
+const APP_V = 73;
 const THATY_K = "aUOFp9z__LOj-nDHiExl2OLX";
 function viewLogin(){
   return `<div class="login"><div class="brand" style="justify-content:center">Produção <em>Thaty ✨</em></div>
